@@ -31,49 +31,40 @@ def construct_knn_approx(train_inputs, train_targets, k):
     For 1 dimensional training data, it produces a function:reals-> reals
     that outputs the mean training value in the k-Neighbourhood of any input.
     """
-    # Create Euclidean distance.
+    # Create Euclidean distance
     distance = lambda x,y: (x-y)**2
-    print(np.shape(train_inputs))
-#    train_inputs = np.resize(train_inputs, (1, train_inputs.size)) #convert into row-vector (1,19188 (11x1599))
     train_inputs = train_inputs.transpose() # 12 x 1599
-    print("shape train_inputs old", np.shape(train_inputs))
-    data = train_inputs[:11,:]
-    print("shape train_inputs new aka data ", np.shape(data))
+    # Take all the independent variables, exclude the independent one (quality)
+    # TODO: Does the 11 still fit with new data set?
+    data = train_inputs[:11,:] # 11 x 1599
+    # 11 x-values of invented data point of which quality should be predicted 
     Xx = np.array([4, 0.7, 0.1, 3, 0.07, 13, 40, 0.9964, 3, 0.56, 10])
-    print("Xx shape:", np.shape(Xx))
+
     def prediction_function(Xx):
+        # Reshape arrays of x-values into 11 x 1 column vector
         Xx = Xx.reshape((Xx.size,1))
-        print(Xx.shape)
-        print(Xx)
+        # Calculates distance between data points and the invented data point to predict (11 x 1599)
         distances = distance(data, Xx)
-        print("distance shape old: ", np.shape(distances))
+        
+        # Sums up all distances per column (axis = 0), so that there's only 1 distance left per data point
         distanceSum = [np.sum(distances, axis = 0)]
         distanceSum = np.array(distanceSum)
-        distanceSum = distanceSum.reshape((1, distanceSum.size))
-        print("distanceSum shape new: ", np.shape(distanceSum)) # 1 x 1599 (row vector will distances of all datapoints)
-        ys = train_inputs[11,:].reshape(1, 1599)
-        print("Shape of train_inputs[11,:]", np.shape(ys))
+        distanceSum = distanceSum.reshape((1, distanceSum.size)) # 1 x 1599
         
-        # append the quality values to the distance values (making a 2 x 1599 array)
+        # All quality values of the data points 
+        ys = train_inputs[11,:].reshape(1, len(data[1,:]))
+        print(np.shape(ys))
+        
+        # Append the quality values to the distance values (making a 2 x 1599 array "distanceQuality")
         distanceQuality = np.append(distanceSum, ys, axis = 0)
-        print("distanceQuality appended shape: ", np.shape(distanceQuality))
         
-        #sort array with regard to first row (distanceSum)
-        distanceQuality = distanceQuality.transpose()
+        # Sort array with regard to first row (distanceSum)
+        distanceQuality = distanceQuality.transpose() # 1599 x 2
         distanceQSorted = distanceQuality[distanceQuality[:,0].argsort()]
-        print("distanceQSorted shape: ", np.shape(distanceQSorted))
         
-        #average over k-nearest neighbours
+        # Average over k-nearest neighbours
         predicts = np.mean(distanceQSorted[:k,1])
         print(predicts)
-        
-        
-        #print("Xx size:", Xx.size)
-        #predicts = np.empty(Xx.size)
-        #for i, neighbourhood in enumerate(np.argpartition(distances, k)[:,:k]):
-            # the neighbourhood is the indices of the closest inputs to xs[i]
-            # the prediction is the mean of the targets for this neighbourhood
-            # predicts[i] = np.mean(train_targets[neighbourhood])
         return predicts
     # We return a handle to the locally defined function
     return prediction_function(Xx)
