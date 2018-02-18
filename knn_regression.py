@@ -33,32 +33,52 @@ def construct_knn_approx(train_inputs, train_targets, k):
     """
     # Create Euclidean distance.
     distance = lambda x,y: (x-y)**2
-    print("Size of data: %d" % train_inputs.size)
-    print("Shape of data inputs:", np.shape(train_inputs))
-    train_inputs = np.resize(train_inputs, (1,train_inputs.size))
-    print("Shape of data inputs after resizing:", np.shape(train_inputs))
-    inputs = [7.5, 0.7, 0.1, 2, 0.03, 10, 30, 0.99, 3.46, 1.56, 9.3]
-    def prediction_function(inputs):
-        print("Hello")
-        inputs = np.array([7.5, 0.7, 0.1, 2, 0.03, 10, 30, 0.99, 3.46, 1.56, 9.3])
-        inputs = inputs.reshape((inputs.size,1))
-        print("inputs:", inputs)
-        print(np.shape(inputs))
-        distances = distance(train_inputs, inputs)
-        print(np.shape(distances))
-        predicts = np.empty(inputs.size)
-        print("predicts empty", predicts)
-        for i, neighbourhood in enumerate(np.argpartition(distances, k)[:,:k]):
+    print(np.shape(train_inputs))
+#    train_inputs = np.resize(train_inputs, (1, train_inputs.size)) #convert into row-vector (1,19188 (11x1599))
+    train_inputs = train_inputs.transpose() # 12 x 1599
+    print("shape train_inputs old", np.shape(train_inputs))
+    data = train_inputs[:11,:]
+    print("shape train_inputs new aka data ", np.shape(data))
+    Xx = np.array([4, 0.7, 0.1, 3, 0.07, 13, 40, 0.9964, 3, 0.56, 10])
+    print("Xx shape:", np.shape(Xx))
+    def prediction_function(Xx):
+        Xx = Xx.reshape((Xx.size,1))
+        print(Xx.shape)
+        print(Xx)
+        distances = distance(data, Xx)
+        print("distance shape old: ", np.shape(distances))
+        distanceSum = [np.sum(distances, axis = 0)]
+        distanceSum = np.array(distanceSum)
+        distanceSum = distanceSum.reshape((1, distanceSum.size))
+        print("distanceSum shape new: ", np.shape(distanceSum)) # 1 x 1599 (row vector will distances of all datapoints)
+        ys = train_inputs[11,:].reshape(1, 1599)
+        print("Shape of train_inputs[11,:]", np.shape(ys))
+        
+        # append the quality values to the distance values (making a 2 x 1599 array)
+        distanceQuality = np.append(distanceSum, ys, axis = 0)
+        print("distanceQuality appended shape: ", np.shape(distanceQuality))
+        
+        #sort array with regard to first row (distanceSum)
+        distanceQuality = distanceQuality.transpose()
+        distanceQSorted = distanceQuality[distanceQuality[:,0].argsort()]
+        print("distanceQSorted shape: ", np.shape(distanceQSorted))
+        
+        #average over k-nearest neighbours
+        predicts = np.mean(distanceQSorted[:k,1])
+        print(predicts)
+        
+        
+        #print("Xx size:", Xx.size)
+        #predicts = np.empty(Xx.size)
+        #for i, neighbourhood in enumerate(np.argpartition(distances, k)[:,:k]):
             # the neighbourhood is the indices of the closest inputs to xs[i]
             # the prediction is the mean of the targets for this neighbourhood
-            predicts[i] = np.mean(train_targets[neighbourhood])
-            print(predicts[i])
-        print("Predicts: xx", predicts)
+            # predicts[i] = np.mean(train_targets[neighbourhood])
         return predicts
     # We return a handle to the locally defined function
-    return prediction_function(inputs)
+    return prediction_function(Xx)
     
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+
 def main(ifname):
     data = import_data(ifname)
     if type(data) == np.ndarray:
