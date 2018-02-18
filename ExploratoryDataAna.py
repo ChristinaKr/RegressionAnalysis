@@ -255,12 +255,13 @@ def scatter_alcohol_density(data):
     ax.plot(x_val, y_val, 'x')
     ax.plot(x_val, np.poly1d(np.polyfit(x_val, y_val, 1))(x_val), color = 'r', linewidth = 2.0)
 
+    
 
 def main(ifname):
     data = import_data(ifname)
     if type(data) == np.ndarray:
         print("Data array loaded: there are %d rows" % data.shape[0])
-        print "first row:", data[0,:]
+        print ("first row:", data[0,:])
     histogram_quality(data)
     hist_citricA(data)
     scatter_ph_versus_ca(data)
