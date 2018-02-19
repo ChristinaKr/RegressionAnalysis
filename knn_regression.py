@@ -63,7 +63,7 @@ def construct_knn_approx(train_inputs, train_targets, k):
         distanceQSorted = distanceQuality[distanceQuality[:,0].argsort()]
         
         # Average over k-nearest neighbours
-        predicts = np.mean(distanceQSorted[:k,1])
+        predicts = np.round(np.mean(distanceQSorted[:k,1]),0)
         print(predicts)
         return predicts
     # We return a handle to the locally defined function
