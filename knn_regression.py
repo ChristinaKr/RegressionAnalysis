@@ -35,7 +35,6 @@ def construct_knn_approx(train_inputs, train_targets, k):
     distance = lambda x,y: (x-y)**2
     train_inputs = train_inputs.transpose() # 12 x 1599
     # Take all the independent variables, exclude the independent one (quality)
-    # TODO: Does the 11 still fit with new data set?
     data = train_inputs[:11,:] # 11 x 1599
     # 11 x-values of invented data point of which quality should be predicted 
     Xx = np.array([4, 0.7, 0.1, 3, 0.07, 13, 40, 0.9964, 3, 0.56, 10])
