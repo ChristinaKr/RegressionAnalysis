@@ -55,8 +55,6 @@ def predictive_distribution(designmtx, beta, mN, SN):
     sigma2Ns = np.ones(N)/beta
     for n in range(N):
         # now calculate and add in the data dependent term
-        # NOTE: I couldn't work out a neat way of doing this without a for-loop
-        # NOTE: but if anyone can please share the answer.
         phi_n = Phi[n,:].transpose()
         sigma2Ns[n] += phi_n.transpose()*SN*phi_n
     return np.array(ys).flatten(), np.array(sigma2Ns)    
@@ -164,7 +162,7 @@ def plot_data_and_approximation(
     predict_func - the approximating function
     inputs - the input data
     targets - the targets
-    true_func - the true function
+
     <for optional arguments see plot_function_and_data>
 
     returns
@@ -417,14 +415,14 @@ def evaluate_rbf_for_various_reg_params(
     ax.plot(xlim, test_error_linear*np.ones(2), 'g:')
     ax.set_xscale('log')
 
-def parameter_search_rbf(inputs, targets, test_fraction):
+def parameter_search_rbf(inputs, targets, test_fraction, sample_fraction=0.1):
     """
     """
     N = inputs.shape[0]
     # run all experiments on the same train-test split of the data 
     train_part, test_part = train_and_test_split(N, test_fraction=test_fraction)
-    # for the centres of the basis functions sample 10% of the data
-    sample_fraction = 0.1
+
+    #sample_fraction = 0.1
     p = (1-sample_fraction,sample_fraction)
     centres = inputs[np.random.choice([False,True], size=N, p=p),:]
     print("centres.shape = %r" % (centres.shape,))
@@ -575,7 +573,7 @@ def main(ifname):
     train_error_linear, test_error_linear = evaluate_linear_approx(inputs, targets, test_fraction)
     evaluate_rbf_for_various_reg_params(inputs, targets, test_fraction, test_error_linear)
     #Find the best scales and regularisation parameter 
-    best_scale, best_regparam, centres =  parameter_search_rbf(inputs, targets, test_fraction)
+    best_scale, best_regparam, centres =  parameter_search_rbf(inputs, targets, test_fraction, sample_fraction=0.4)
     
     plt.show()
     
@@ -590,7 +588,7 @@ def main(ifname):
     M = designmtx.shape[1]
     # define a prior mean and covariance matrix
     m0 = np.zeros(M)
-    alpha = 10
+    alpha = 100
     S0 = alpha * np.identity(M)
     # define the noise precision of our data
     beta = 10000000
@@ -605,36 +603,47 @@ def main(ifname):
     # 3 - residual_sugar; 4 - chlorides; 5 -  free_sulfur;
     # 6 - total_sulfur_dioxide; 7 - density; 8 - pH;
     # 9 - sulphates; 10 - alcohol  
-    i = 0
-    one_variable_input = inputs[:,i]
-    field_name = field_names[i]
+    v = 0
+    changing_parameter = inputs[:,v]
+    field_name = field_names[v]
     
     fig, ax, lines = plot_data_and_approximation(
-        mean_approx, one_variable_input, targets, xlim=[np.min(one_variable_input)-2, np.max(one_variable_input)+2])
+        mean_approx, changing_parameter, targets, xlim=[np.min(changing_parameter), np.max(changing_parameter)])
     ax.set_xlabel(field_name);
     ax.set_ylabel("Quality");
         
     
     #now for the predictive distribuiton
-    new_inputs = []
-    for i in range (0, M+1):
-        new_variable = np.mean(inputs[:,i])
-        new_inputs.append(new_variable)
-    new_inputs = np.array(new_inputs)
-    print(new_inputs)
+    new_inputs = np.array([])
+    
+    for j in range (0, 11):
+        new_column = np.array([])
+        if j == v:
+            new_column = np.linspace(np.min(changing_parameter), np.max(changing_parameter), 50)
+            print(new_column)
+        else:
+            new_variable = np.mean(inputs[:,j])
+            for i in range (0, 50):
+                new_column = np.append(new_column, new_variable)       
+        if j == 0:
+            new_inputs = new_column
+        else:
+            new_inputs = np.column_stack((new_inputs, new_column))
     
     new_designmtx = feature_mapping(new_inputs)
     ys, sigma2Ns = predictive_distribution(new_designmtx, beta, mN, SN)
     print("sigma2Ns = %r" % (sigma2Ns,))
-    fig, ax, lines = plot_data_and_approximation(mean_approx, one_variable_input, targets, xlim=[np.min(new_inputs),np.max(new_inputs)])
-    ax.plot(new_inputs, ys, 'r', linewidth=3)
-    ax.set_xlabel(field_name);
-    ax.set_ylabel("Quality");
+   
+    fig1 = plt.figure()
+    ax1 = fig1.add_subplot(1,1,1)
+    ax1.plot(new_inputs[:,v], ys, 'r', linewidth=3)
+    ax1.scatter(changing_parameter, targets)
+    ax1.set_xlabel(field_name);
+    ax1.set_ylabel("Quality");
+
     lower = ys-np.sqrt(sigma2Ns)
     upper = ys+np.sqrt(sigma2Ns)
-    print("lower.shape = %r" % (lower.shape,))
-    print("upper.shape = %r" % (upper.shape,))
-    ax.fill_between(new_inputs, lower, upper, alpha=0.2, color='r')
+    ax1.fill_between(new_inputs[:,v], lower, upper, alpha=0.2, color='r')
     plt.show()
         
         
@@ -642,8 +651,6 @@ if __name__ == '__main__':
     import sys
     # this allows you to pass the file name as the first argument when you call
     # your script from the command line
-    # so to run this script use:
-    # python old_faithful.py old_faithful.tsv
     try:
         main(sys.argv[1])
     except IndexError:
