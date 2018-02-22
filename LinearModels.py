@@ -94,7 +94,7 @@ def main(
     X2 = inputs
     y2 = targets
     ones = np.ones((1599,1))
-    X2 = np.hstack((ones,X2)) # so she has a first column with only 1s and the next 11 columns are the x-data values
+    X2 = np.hstack((ones,X2))
     #print (np.matrix(data[:,11])).T
     
     # convert to matrices and initialize theta
@@ -131,7 +131,7 @@ def evaluate_linear_approx(inputs, targets, test_fraction):
     test_errors = []
     for reg_param in reg_params:
         print("Evaluating reg_para " + str(reg_param))
-        train_error, test_error =     print("train_part = ", train_part)(
+        train_error, test_error = simple_evaluation_linear_model(
             inputs, targets, test_fraction=test_fraction, reg_param=reg_param)
         train_errors.append(train_error)
         test_errors.append(test_error)
@@ -174,14 +174,8 @@ def regularised_ml_weights(
 def predict_wine(x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,theta):
     x_i = sp.matrix([x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11])
     x_n = (x_i - np.mean(x_i))/np.std(x_i) # normalise
-    print(sp.matrix([1]))
     x = sp.hstack((sp.matrix([1]), x_n))
-    print(x)
-    print("X shape: ", np.shape(x))
-    print("Theta shape: ", np.shape(theta))
-    print(theta.T)
     quality = (x * theta.T)
-    print("Quality shape: ", np.shape(quality))
     print ("Quality of wine with fixed acidity {}, volitile acidity {}, citric acid {}, residual sugar {}, chlorides {}, free sulfur dioxide {}, total sulfur dioxide {}, density {}, pH {}, sulphates {} and alcohol {} has a predicted quality of {}".format(x1, x2, x3,x4,x5,x6,x7,x8,x9,x10,x11,quality))
 
 def gradientDescent(X, y, theta2, alpha, iters):

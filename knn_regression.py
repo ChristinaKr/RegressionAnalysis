@@ -6,10 +6,10 @@ Created on Tue Feb 20 10:17:38 2018
 @author: christinakronser
 """
 
-
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.stats.stats import pearsonr   
 
 def import_data(ifname):
     """
@@ -81,20 +81,23 @@ def train_and_test_partition(inputs, targets, train_part, test_part):
     return train_inputs, train_targets, test_inputs, test_targets
     
 
-def construct_knn_approx(train_inputs, train_targets, k, test_inputs, test_targets):  
+def construct_knn_approx(train_inputs, train_targets, k, test_inputs, test_targets, seed = None):  
     """
     Outputs the mean training value in the k-Neighbourhood of any input.
     """
+    if not seed is None:
+        np.random.seed(seed)
+    
     # Create Euclidean distance
     distance = lambda x,y: (x-y)**2   
     train_inputs = train_inputs.transpose() # 11 x 1209
 #    print(np.shape(train_inputs)) 
     # 11 x-values of invented data point of which quality should be predicted 
 #    test_inputs = np.array([4, 0.7, 0.1, 3, 0.07, 13, 40, 0.9964, 3, 0.56, 10])
-    predicts = np.empty(test_targets.size)
-#    print(test_targets.size)
+    predictsRounded = np.empty(test_targets.size)
+    predictsNotRounded = np.empty(test_targets.size)
 
-    def prediction_function(test_inputs, predicts):
+    def prediction_function(test_inputs, predictsRounded, predictsNotRounded):
         # Reshape arrays of x-values into 11 x [amount of data points] column vector
         test_inputs = test_inputs.transpose() # 11 x 410
         
@@ -126,52 +129,76 @@ def construct_knn_approx(train_inputs, train_targets, k, test_inputs, test_targe
 #            print("distanceQSorted shape: ", np.shape(distanceQSorted))
         
             # Average over k-nearest neighbours
-            predicts[i] = np.round(np.mean(distanceQSorted[:k,1]),0)
+            predictsRounded[i] = np.round(np.mean(distanceQSorted[:k,1]),0)
 #            print("predicts[i]: ", predicts[i])
+            predictsNotRounded[i] = np.mean(distanceQSorted[:k,1])
             
-        predicts = np.array(predicts)
+        predictsRounded = np.array(predictsRounded)
+#        print(predictsRounded)
+        predictsNotRounded = np.array(predictsNotRounded)
+#        print(predictsNotRounded)
 #        print("Shape predicts xx: ", np.shape(predicts))
-        print(predicts)
-        return predicts
+#        print(predicts)
+        return predictsRounded, predictsNotRounded
     # We return a handle to the locally defined function
-    return prediction_function(test_inputs, predicts)
+    return prediction_function(test_inputs, predictsRounded, predictsNotRounded)
     
 def sum_of_squared_errors(train_targets, predicts, test_targets):
     N = test_targets.size
     mse = np.sum((test_targets.flatten() - predicts.flatten())**2)/N
     return np.sqrt(mse)
     
-def test_best_k(train_inputs, train_targets, test_inputs, test_targets, k_range):
-    
-    SSEs = np.empty(k_range)
-    i = 2
+def test_best_k(train_inputs, train_targets, test_inputs, test_targets, k_range, seed):
+    seed = seed
+    SSEsRounded = np.empty(k_range)
+    SSEsNotRounded = np.empty(k_range)
     for i in range (k_range):
         k = i + 1
-        predicts = construct_knn_approx(train_inputs, train_targets, k, test_inputs, test_targets)
+        predictsRounded, predictsNotRounded = construct_knn_approx(train_inputs, train_targets, k, test_inputs, test_targets, seed )
         # collect SSE in array
-        SSEs[i] = sum_of_squared_errors(train_targets, predicts, test_targets)
+#        print("predictsRounded: ", predictsRounded)
+#        print("predictsNotRounded: ", predictsNotRounded)
+        SSEsRounded[i] = sum_of_squared_errors(train_targets, predictsRounded, test_targets)
+        SSEsNotRounded[i] = sum_of_squared_errors(train_targets, predictsNotRounded, test_targets)
 #        print("for loop round:", i)
 
-    
+#    print("SSEsRounded: ", SSEsRounded)
+#    print("SSEsNotRounded: ", SSEsNotRounded)
     # Plot errors over different values of k
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    xs = np.array(np.linspace(1, k_range, k_range))
-    ys = SSEs
-    ax.plot(xs, ys, 'g-', linewidth=3)
+    xs = np.array(np.linspace(1, k_range, num=k_range))
+    ys = SSEsRounded
+    rounded_SSE_line, = ax.plot(xs, ys, 'g-', linewidth=3)
+    ys = SSEsNotRounded
+    notRounded_SSE_line, = ax.plot(xs, ys, 'r-', linewidth=3)
     ax.set_xlabel("k")
     ax.set_ylabel("SSEs")
+    ax.legend([rounded_SSE_line, notRounded_SSE_line],["rounded predictions", "not rounded predictions"])
     fig.suptitle('Errors over different values of k')
     
     # Returns index of minimum SSE
-    indexMinSSE = np.argmin(SSEs)
+    indexRoundedSSE = np.argmin(SSEsRounded)
+    indexNotRoundedSSE = np.argmin(SSEsNotRounded)
     # Returns min SSE
-    print("type of SSEs:", type(SSEs))
-    minSSE = SSEs[indexMinSSE]
-    # Returns optimised k-value
-    optK = xs[indexMinSSE]
+#    print("type of SSEs:", type(SSEsRounded))
+    minSSERounded = SSEsRounded[indexRoundedSSE]
+    minSSENotRounded = SSEsNotRounded[indexNotRoundedSSE]
     
-    print("The value for k with the smallest error of %r is %r" % (minSSE, optK) )
+    # Returns optimised k-value
+    optKRounded = xs[indexRoundedSSE]
+    optKNotRounded = xs[indexNotRoundedSSE]
+    
+    print("The rounded value for k with the smallest error of %r is %r" % (minSSERounded, optKRounded) )
+    print("The unrounded value for k with the smallest error of %r is %r" % (minSSENotRounded, optKNotRounded) )
+    
+    if minSSERounded < minSSENotRounded:
+        minSSE = minSSERounded
+        optK = optKRounded
+    else:
+        minSSE = minSSENotRounded
+        optK = optKNotRounded
+
 
     return fig, ax, minSSE, optK    
         
@@ -179,40 +206,219 @@ def test_best_k(train_inputs, train_targets, test_inputs, test_targets, k_range)
         # return k for which SSE is minimized
         # feed that into construct_knn_...
 
+def plot_errors_for_different_k(train_inputs, train_targets, test_inputs, test_targets, k_range, seed):
 
+    SSEsRounded = np.empty(k_range)
+    SSEsNotRounded = np.empty(k_range)
+    for i in range (k_range):
+        k = i + 1
+        predictsRounded, predictsNotRounded = construct_knn_approx(train_inputs, train_targets, k, test_inputs, test_targets, seed )
+        # collect SSE in array
+#        print("predictsRounded: ", predictsRounded)
+#        print("predictsNotRounded: ", predictsNotRounded)
+        SSEsRounded[i] = sum_of_squared_errors(train_targets, predictsRounded, test_targets)
+        SSEsNotRounded[i] = sum_of_squared_errors(train_targets, predictsNotRounded, test_targets)
+#        print("for loop round:", i)
+        
+    return SSEsRounded, SSEsNotRounded
+    
+  
+
+def test_and_trainings_data(data):
+    
+    inputs = data[:,[0,1,2,3,4,5,6,7,8,9,10]]
+    targets = data[:,11]
+    
+    # Prepare the data for normalisation
+    fixed_acidity_inputs = inputs[:,0]
+    volatile_acidity_inputs = inputs[:,1]
+    citric_acid_inputs = inputs[:,2]
+    residual_sugar_inputs = inputs[:,3]
+    chlorides_inputs = inputs[:,4]
+    free_sulfur_dioxide_inputs = inputs[:,5]
+    total_sulfur_dioxide_inputs = inputs[:,6]
+    density_inputs = inputs[:,7]
+    pH_inputs = inputs[:,8]
+    sulphates_inputs = inputs[:,9]
+    alcohol_inputs = inputs[:,10]
+    
+    # Normalise inputs
+    inputs[:,0] = (fixed_acidity_inputs - np.mean(fixed_acidity_inputs))/np.std(fixed_acidity_inputs)
+    inputs[:,1] = (volatile_acidity_inputs - np.mean(volatile_acidity_inputs))/np.std(volatile_acidity_inputs)
+    inputs[:,2] = (citric_acid_inputs - np.mean(citric_acid_inputs))/np.std(citric_acid_inputs)
+    inputs[:,3] = (residual_sugar_inputs - np.mean(residual_sugar_inputs))/np.std(residual_sugar_inputs)
+    inputs[:,4] = (chlorides_inputs - np.mean(chlorides_inputs))/np.std(chlorides_inputs)
+    inputs[:,5] = (free_sulfur_dioxide_inputs - np.mean(free_sulfur_dioxide_inputs))/np.std(free_sulfur_dioxide_inputs)
+    inputs[:,6] = (total_sulfur_dioxide_inputs - np.mean(total_sulfur_dioxide_inputs))/np.std(total_sulfur_dioxide_inputs)
+    inputs[:,7] = (density_inputs - np.mean(density_inputs))/np.std(density_inputs)
+    inputs[:,8] = (pH_inputs - np.mean(pH_inputs))/np.std(pH_inputs)
+    inputs[:,9] = (sulphates_inputs - np.mean(sulphates_inputs))/np.std(sulphates_inputs)
+    inputs[:,10] = (alcohol_inputs - np.mean(alcohol_inputs))/np.std(alcohol_inputs)
+    
+    # Get the train test split
+    train_part, test_part = train_and_test_split(
+        inputs.shape[0], test_fraction=0.25)
+    # Break the data into train and test parts
+    train_inputs, train_targets, test_inputs, test_targets = \
+        train_and_test_partition(inputs, targets, train_part, test_part)
+    
+    return train_inputs, train_targets, test_inputs, test_targets, inputs
+
+def correlation_parameters(inputs, data):
+    # correlation between normalised inputs and quality
+    targets = data[:,11]
+    corr_0 = pearsonr(inputs[:,0], targets)
+    corr_1 = pearsonr(inputs[:,1], targets)
+    corr_2 = pearsonr(inputs[:,2], targets)
+    corr_3 = pearsonr(inputs[:,3], targets)
+    corr_4 = pearsonr(inputs[:,4], targets)
+    corr_5 = pearsonr(inputs[:,5], targets)
+    corr_6 = pearsonr(inputs[:,6], targets)
+    corr_7 = pearsonr(inputs[:,7], targets)
+    corr_8 = pearsonr(inputs[:,8], targets)
+    corr_9 = pearsonr(inputs[:,9], targets)
+    corr_10 = pearsonr(inputs[:,10], targets)
+    
+    correlations = [corr_0[0], corr_1[0], corr_2[0], corr_3[0], corr_4[0], corr_5[0], corr_6[0], corr_7[0], corr_8[0], corr_9[0], corr_10[0]]
+    correlations = np.absolute(correlations)
+    print("correlations", correlations)
+    
+    a=0
+    indicesHighestCorr = []
+    for i in correlations:
+        if correlations[a] > 0.2:
+            print("index: ", a)
+            indicesHighestCorr = np.append(indicesHighestCorr, a)
+        a+=1
+    
+    print("Shape indicesHighestCorr: ", np.shape(indicesHighestCorr))
+    
+    
+    #2d array (rows, size(indicesHighestCorr))
+    inputCorr = np.zeros(shape=((inputs[:,0]).size, indicesHighestCorr.size)) # 1599 x 4
+    b=0
+    indicesHighestCorr = indicesHighestCorr.astype(int)
+    print("indicesHighestCorr[b]: ", indicesHighestCorr[b])
+    for i in indicesHighestCorr:
+#        indicesHighestCorr[b] = np.round(indicesHighestCorr[b],0)
+        inputCorr[:, b] = inputs[:,indicesHighestCorr[b]]
+        b+=1
+    print("Shape inputCorr: ", np.shape(inputCorr)) # should be 1599 x 4
+    
+    targetCorr = targets
+    
+    return inputCorr, targetCorr  
+
+def error_with_highest_corr_inputs_only(inputCorr, targetCorr):  
+    # Randomise training and test data for the highest correlating paramters
+    # Get the train test split
+    train_part, test_part = train_and_test_split(
+        inputCorr.shape[0], test_fraction=0.25)
+    # Break the data into train and test parts
+    train_inputs, train_targets, test_inputs, test_targets = \
+        train_and_test_partition(inputCorr, targetCorr, train_part, test_part)
+
+    # Find k optimised for smallest error and plot errors over different values for k
+    print("Taking only most correlating parameters into account:")
+    test_best_k(train_inputs, train_targets, test_inputs, test_targets, 20, seed = 28)
+#    plt.show()
+    
+def plot_all_inputs_vs_most_correlated_inputs():
+    
+    runs = 100
+    k_range = 20
+    SSEs2dCorrInputs = np.zeros(shape=(runs, k_range))
+    SSEs2dNotRounded = np.zeros(shape=(runs, k_range))
+    for i in range(runs):
+        train_inputs, train_targets, test_inputs, test_targets, inputs = test_and_trainings_data(data)
+        SSEsRounded, SSEsNotRounded = plot_errors_for_different_k(train_inputs, train_targets, test_inputs, test_targets, 20, None)
+        SSEsCorrInputs = test_best_k(train_inputs, train_targets, test_inputs, test_targets, 20, None)
+        SSEs2dCorrInputs[i] = SSEsCorrInputs # 100 x 20
+        SSEs2dNotRounded[i] = SSEsNotRounded # 100 x 20
+    
+    #SSEsRoundedMean = np.mean(SSEs2dRounded, axis = 0)
+    #SSEsNotRoundedMean = np.mean(SSEs2dNotRounded, axis = 0)
+    allInputs = np.mean(SSEs2dNotRounded, axis = 0)
+    #TODO: XXX
+    corrInputs = np.mean(XXX, axis = 0)
+    
+    # Plot it
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    xs = np.linspace(1, k_range, num=k_range)
+    ys = allInputs #SSEsNotRoundedMean
+    allInputs_line, = ax.plot(xs, ys, 'g-', linewidth=3)
+    ys = corrInputs #SSEsNotRoundedMean
+    corrInputs_line, = ax.plot(xs, ys, 'r-', linewidth=3)
+    ax.set_xlabel("k")
+    ax.set_ylabel("SSEs")
+    ax.legend([rounded_SSE_line, notRounded_SSE_line],["rounded predictions", "not rounded predictions"])
+    fig.suptitle('Errors over different values of k run 100 times') 
+    plt.show()
+    
+    
 def main(ifname):
     data = import_data(ifname)
     if type(data) == np.ndarray:
         print("Data array loaded: there are %d rows" % data.shape[0])
         print ("first row:", data[0,:])
-    
-    inputs = data[:,[0,1,2,3,4,5,6,7,8,9,10]]
-    targets = data[:,11]
-    # get the train test split
-    train_part, test_part = train_and_test_split(
-        inputs.shape[0], test_fraction=0.25)
-    # break the data into train and test parts
-    train_inputs, train_targets, test_inputs, test_targets = \
-        train_and_test_partition(inputs, targets, train_part, test_part)
-    
-    print ('Train Inputs: ', np.shape(train_inputs)) # 1209 x 11
-    print ('Train Targets: ', np.shape(train_targets)) # 1209,
-    print ('Test Inputs: ', np.shape(test_inputs)) #390 x 11
-    print( 'Test inputs size: ', test_inputs.size)
-    print ('Test Targets: ', np.shape(test_targets)) # 390,
-    print( 'Test targets size: ', test_targets.size) # 390
-    
+        
+    train_inputs, train_targets, test_inputs, test_targets, inputs = test_and_trainings_data(data)
+
     # Find k optimised for smallest error and plot errors over different values for k
-    test_best_k(train_inputs, train_targets, test_inputs, test_targets, 15)
+    test_best_k(train_inputs, train_targets, test_inputs, test_targets, 20, seed = 28)
     plt.show()
     
-    # Plot error over different test and trainings data ratio
+    # Calculate mean rounded and unrounded error over different values of k run 100 times
+    runs = 100
+    k_range = 20
+    SSEs2dRounded = np.zeros(shape=(runs, k_range))
+    SSEs2dNotRounded = np.zeros(shape=(runs, k_range))
+    for i in range(runs):
+        train_inputs, train_targets, test_inputs, test_targets, inputs = test_and_trainings_data(data)
+        SSEsRounded, SSEsNotRounded = plot_errors_for_different_k(train_inputs, train_targets, test_inputs, test_targets, 20, None)
+        SSEs2dRounded[i] = SSEsRounded # 100 x 20
+        SSEs2dNotRounded[i] = SSEsNotRounded # 100 x 20
     
+    SSEsRoundedMean = np.mean(SSEs2dRounded, axis = 0)
+    SSEsNotRoundedMean = np.mean(SSEs2dNotRounded, axis = 0)
+    
+    # Plot it
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    xs = np.linspace(1, k_range, num=k_range)
+    ys = SSEsRoundedMean
+    rounded_SSE_line, = ax.plot(xs, ys, 'g-', linewidth=3)
+    ys = SSEsNotRoundedMean
+    notRounded_SSE_line, = ax.plot(xs, ys, 'r-', linewidth=3)
+    ax.set_xlabel("k")
+    ax.set_ylabel("SSEs")
+    ax.legend([rounded_SSE_line, notRounded_SSE_line],["rounded predictions", "not rounded predictions"])
+    fig.suptitle('Errors over different values of k run 100 times') 
+    plt.show()
+    
+    # Returns index of minimum SSE
+    indexRoundedMeanSSE = np.argmin(SSEsRoundedMean)
+    indexNotRoundedMeanSSE = np.argmin(SSEsNotRoundedMean)
+    # Returns min SSE
+    minSSEMeanRounded = SSEsRoundedMean[indexRoundedMeanSSE]
+    minSSEMeanNotRounded = SSEsNotRoundedMean[indexNotRoundedMeanSSE] 
+    # Returns optimised k-value
+    optKMeanRounded = xs[indexRoundedMeanSSE]
+    optKMeanNotRounded = xs[indexNotRoundedMeanSSE]
+    print("shape of minSSEMeanRounded: ", np.shape(minSSEMeanRounded))
+    
+    print("The smallest rounded mean error over 100 runs is ", minSSEMeanRounded, "with a k of", optKMeanRounded)
+    print("The smallest unrounded mean error over 100 runs is ", minSSEMeanNotRounded, "with a k of", optKMeanNotRounded)
     
     # Perform knn only with parameters most correlated to quality to reduce parameter amount
-    
-    
     # Plot error over different amounts of parameters
+    inputCorr, targetCorr = correlation_parameters(inputs, data)
+    error_with_highest_corr_inputs_only(inputCorr, targetCorr)
+    
+    # Plot: all parameters vs. 4 parameters, unrounded, 100 runs
+    
+    
     
 
 if __name__ == '__main__':
