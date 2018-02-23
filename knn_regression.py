@@ -33,7 +33,7 @@ def import_data(ifname):
         # return this array to caller
         return data_as_array
   
-def train_and_test_split(N, test_fraction=None):
+def train_and_test_split(N, test_fraction=None, seed=None):
     """
     Randomly generates a train/test split for data of size N.
 
@@ -43,6 +43,9 @@ def train_and_test_split(N, test_fraction=None):
     test_fraction - a fraction (between 0 and 1) specifying the proportion of
         the data to use as test data.
     """
+    if not seed is None:
+        np.random.seed(seed)
+    
     if test_fraction is None:
         test_fraction = 0.5
     p = [test_fraction,(1-test_fraction)]
@@ -50,7 +53,7 @@ def train_and_test_split(N, test_fraction=None):
     test_part = np.invert(train_part)
     return train_part, test_part
 
-def train_and_test_partition(inputs, targets, train_part, test_part):
+def train_and_test_partition(inputs, targets, train_part, test_part, seed):
     """
     Splits a data matrix (or design matrix) and associated targets into train
     and test parts.
@@ -72,6 +75,9 @@ def train_and_test_partition(inputs, targets, train_part, test_part):
     test_inputs - the test input matrix
     test_targets - the test targtets
     """
+    if not seed is None:
+        np.random.seed(seed)
+        
     # get the indices of the train and test portion
     train_inputs = inputs[train_part,:]
     test_inputs = inputs[test_part,:]
@@ -79,8 +85,10 @@ def train_and_test_partition(inputs, targets, train_part, test_part):
     test_targets = targets[test_part]
     return train_inputs, train_targets, test_inputs, test_targets
   
-def test_and_trainings_data(data):
-    
+def test_and_trainings_data(data, seed):
+    if not seed is None:
+        np.random.seed(seed)
+        
     inputs = data[:,[0,1,2,3,4,5,6,7,8,9,10]]
     targets = data[:,11]
     
@@ -115,7 +123,7 @@ def test_and_trainings_data(data):
         inputs.shape[0], test_fraction=0.1)
     # Break the data into train and test parts
     train_inputs, train_targets, test_inputs, test_targets = \
-        train_and_test_partition(inputs, targets, train_part, test_part)
+        train_and_test_partition(inputs, targets, train_part, test_part, seed)
     
     return train_inputs, train_targets, test_inputs, test_targets, inputs
 
@@ -173,7 +181,9 @@ def sum_of_squared_errors(train_targets, predicts, test_targets):
     return np.sqrt(mse)
 
 def calculate_errors_for_different_k(train_inputs, train_targets, test_inputs, test_targets, k_range, seed):
-
+    if not seed is None:
+        np.random.seed(seed)
+        
     SSEsRounded = np.empty(k_range)
     SSEsNotRounded = np.empty(k_range)
     for i in range (k_range):
@@ -223,20 +233,22 @@ def correlation_parameters(inputs, data):
     targetCorr = targets
     return inputCorr, targetCorr  
 
-def error_with_highest_corr_inputs_only(inputCorr, targetCorr):  
+def error_with_highest_corr_inputs_only(inputCorr, targetCorr, seed=None):  
+    if not seed is None:
+        np.random.seed(seed)
     # Randomise training and test data for the highest correlating paramters
     # Get the train test split
     train_part, test_part = train_and_test_split(
-        inputCorr.shape[0], test_fraction=0.1)
+        inputCorr.shape[0], test_fraction=0.1, seed = seed)
     # Break the data into train and test parts
     train_inputs, train_targets, test_inputs, test_targets = \
-        train_and_test_partition(inputCorr, targetCorr, train_part, test_part)
+        train_and_test_partition(inputCorr, targetCorr, train_part, test_part, seed = seed)
 
     # Find k optimised for smallest error and plot errors over different values for k
     SSEsRounded, SSEsNotRounded = calculate_errors_for_different_k(train_inputs, train_targets, test_inputs, test_targets, 20, seed = 28)
     return SSEsRounded, SSEsNotRounded
     
-def plot_all_inputs_vs_most_correlated_inputs(data, inputCorr, targetCorr, seed):
+def plot_all_inputs_vs_most_correlated_inputs(data, inputCorr, targetCorr):
     
     runs = 100
     k_range = 20
@@ -244,9 +256,9 @@ def plot_all_inputs_vs_most_correlated_inputs(data, inputCorr, targetCorr, seed)
     SSEs2dallInputs = np.zeros(shape=(runs, k_range))
     
     for i in range(runs):
-        train_inputs, train_targets, test_inputs, test_targets, inputs = test_and_trainings_data(data)
-        SSEsRounded, allInputs = calculate_errors_for_different_k(train_inputs, train_targets, test_inputs, test_targets, 20, None)  
-        SSEsRounded, SSEsCorrInputs = error_with_highest_corr_inputs_only(inputCorr, targetCorr)
+        train_inputs, train_targets, test_inputs, test_targets, inputs = test_and_trainings_data(data, seed = i+1)
+        SSEsRounded, allInputs = calculate_errors_for_different_k(train_inputs, train_targets, test_inputs, test_targets, 20, seed = i +1)  
+        SSEsCorrRounded, SSEsCorrInputs = error_with_highest_corr_inputs_only(inputCorr, targetCorr, seed = i +1)
         SSEs2dCorrInputs[i] = SSEsCorrInputs # 100 x 20
         SSEs2dallInputs[i] = allInputs # 100 x 20
 
@@ -258,12 +270,12 @@ def plot_all_inputs_vs_most_correlated_inputs(data, inputCorr, targetCorr, seed)
     ax = fig.add_subplot(1,1,1)
     xs = np.linspace(1, k_range, num=k_range)
     ys = SSEs2dallInputs
-    allInputs_line, = ax.plot(xs, ys, 'g-', linewidth=3)
+    allInputs_line, = ax.plot(xs, ys, 'r-', linewidth=3)
     ys = corrInputs
-    corrInputs_line, = ax.plot(xs, ys, 'r-', linewidth=3)
+    corrInputs_line, = ax.plot(xs, ys, 'g-', linewidth=3)
     ax.set_xlabel("k")
     ax.set_ylabel("SSEs")
-    ax.legend([corrInputs_line, allInputs_line],[" 4 most highly correlated parameters", "All 11 input parameters"])
+    ax.legend([corrInputs_line, allInputs_line],["Highest correlating parameters only", "All 11 input parameters"])
     fig.suptitle('Errors over different values of k run 100 times - Input parameter comparison') 
     plt.show()
     
@@ -275,17 +287,17 @@ def plot_all_inputs_vs_most_correlated_inputs(data, inputCorr, targetCorr, seed)
     optKCorr = xs[indexCorrSSE]
     optKAllP = xs[indexAllPSSE]
     
-    print("The smallest mean error over 100 runs for only the most highly correlated parameters is ", minSSECorr, "with a k of", optKCorr)
-    print("The smallest mean error over 100 runs for all parameters included is ", minSSEAllP, "with a k of", optKAllP)
+    print("The smallest mean error over 100 runs for only the most highly correlated parameters is", minSSECorr, "with a k of", optKCorr)
+    print("The smallest mean error over 100 runs for all parameters included is", minSSEAllP, "with a k of", optKAllP)
     
-def calculate_and_plot_rounded_vs_unrounded_mse(data, seed):
+def calculate_and_plot_rounded_vs_unrounded_mse(data):
     runs = 100
     k_range = 20
     SSEs2dRounded = np.zeros(shape=(runs, k_range))
     SSEs2dNotRounded = np.zeros(shape=(runs, k_range))
     for i in range(runs):
-        train_inputs, train_targets, test_inputs, test_targets, inputs = test_and_trainings_data(data)
-        SSEsRounded, SSEsNotRounded = calculate_errors_for_different_k(train_inputs, train_targets, test_inputs, test_targets, 20, None)
+        train_inputs, train_targets, test_inputs, test_targets, inputs = test_and_trainings_data(data, seed = i+1)
+        SSEsRounded, SSEsNotRounded = calculate_errors_for_different_k(train_inputs, train_targets, test_inputs, test_targets, 20, seed = i +1)
         SSEs2dRounded[i] = SSEsRounded # 100 x 20
         SSEs2dNotRounded[i] = SSEsNotRounded # 100 x 20
     
@@ -314,8 +326,8 @@ def calculate_and_plot_rounded_vs_unrounded_mse(data, seed):
     optKMeanRounded = xs[indexRoundedMeanSSE]
     optKMeanNotRounded = xs[indexNotRoundedMeanSSE]
     
-    print("The smallest mean error over 100 runs with rounded predictions is ", minSSEMeanRounded, "with a k of", optKMeanRounded)
-    print("The smallest mean error over 100 runs with unrounded predictions is ", minSSEMeanNotRounded, "with a k of", optKMeanNotRounded)
+    print("The smallest mean error over 100 runs with rounded predictions is", minSSEMeanRounded, "with a k of", optKMeanRounded)
+    print("The smallest mean error over 100 runs with unrounded predictions is", minSSEMeanNotRounded, "with a k of", optKMeanNotRounded)
      
     
 def main(ifname):
@@ -324,18 +336,18 @@ def main(ifname):
         print("Data array loaded: there are %d rows" % data.shape[0])
     
     # Split remaining 85% of data into test and trainings data, inputs are the normalized input values
-    train_inputs, train_targets, test_inputs, test_targets, inputs = test_and_trainings_data(data)
+    train_inputs, train_targets, test_inputs, test_targets, inputs = test_and_trainings_data(data, seed = None)
     
     # Calculate rounded and unrounded mean error over different values of k run 100 times
     # to check whether it makes a difference to round the predictions as they're discrete values
     # Also plots the errors over different values of k averaged over 100 runs for both - rounded and unrounded
-    calculate_and_plot_rounded_vs_unrounded_mse(data, seed = 24)
+    calculate_and_plot_rounded_vs_unrounded_mse(data)
     
     # Perform knn only with parameters most correlated to quality to reduce parameter amount
     # Plot error over different amounts of parameters
     inputCorr, targetCorr = correlation_parameters(inputs, data)
     error_with_highest_corr_inputs_only(inputCorr, targetCorr)
-    plot_all_inputs_vs_most_correlated_inputs (data, inputCorr, targetCorr, seed = 24)
+    plot_all_inputs_vs_most_correlated_inputs (data, inputCorr, targetCorr)
     
     
 
