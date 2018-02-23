@@ -4,19 +4,6 @@ import numpy.linalg as linalg
 import matplotlib.pyplot as plt
 import scipy as sp
 
-#from LinearModelsMethods import plot_train_test_errors
-from LinearModelsMethods import simple_evaluation_linear_model
-#from LinearModelsMethods import exploratory_plots
-from LinearModelsMethods import ml_weights
-from LinearModelsMethods import train_and_test_partition
-from LinearModelsMethods import train_and_test
-from regression_models import construct_polynomial_approx
-
-from regression_train_test import create_cv_folds
-
-#from gradientDescent import gradientDescent
-#from gradientDescent import computeCost
-
 def main(
         ifname, delimiter=None, columns=None, has_header=True,
         test_fraction=0.25):
@@ -163,11 +150,6 @@ def main(
     
     print "Error with gradient descent:", test_error_gd
     
-    '''error_gd, fig, ax = calc_gd(inputs, targets)'''
-    
-    # plot linear approximation for a input variable (the first arg)
-    fig, ax = plot_linear_approx(10, inputs, field_names, targets)
-    
     plt.show()
 
 def exploratory_plots(data, field_names=None):
@@ -189,7 +171,280 @@ def exploratory_plots(data, field_names=None):
                 ax.set_yticks(ax.get_yticks()[::2])
                 ax.set_xticks(ax.get_xticks()[::2])          
     plt.tight_layout()
+
+def evaluate_linear_approx(inputs, targets, test_fraction):
+    '''
+    This evaluates the linear performance of the data. 
+    This takes in an input variable of runs - this is the number of times the errors are calculated for each reg param,
+        this is then averaged and the mean is plot, therefore producing a smooth and accurate curve.
+    '''
+    # the linear performance
+    reg_params = np.logspace(-15,-4, 11)
+    train_errors = []
+    test_errors = []
     
+    # plot the average for a number of runs
+    for reg_param in reg_params:
+        #print("Evaluating reg_para " + str(reg_param))
+        train_error, test_error = simple_evaluation_linear_model(
+            inputs, targets, test_fraction=test_fraction, reg_param=reg_param)
+        train_errors.append(train_error)
+        test_errors.append(test_error)
+        # once errors calculated for no. of runs, calculate average, append and clear array for next reg param
+    
+    fig , ax = plot_train_test_errors(
+        "$\lambda$", reg_params, train_errors, test_errors)
+    # we also want to plot a straight line showing the linear performance
+    xlim = ax.get_xlim()
+    #test, = ax.plot(xlim, test_error*np.ones(2), ':g', label='test')
+    #ax.legend([train_line, test_line, test], ["train", "test", "test error"], loc=1)
+    ax.set_xscale('log')
+    
+    print("Linear Regression:")
+    print("\t(train_error, test_error) = %r" % ((train_error, test_error),))
+    return train_errors, test_errors, fig, ax
+
+def simple_evaluation_linear_model(
+        inputs, targets, test_fraction=None, reg_param=None):
+    """
+    Will split inputs and targets into train and test parts, then fit a linear
+    model to the training part, and test on the both parts.
+
+    Inputs can be a data matrix (or design matrix), targets should
+    be real valued.
+
+    parameters
+    ----------
+    inputs - the input design matrix (any feature mapping should already be
+        applied)
+    targets - the targets as a vector
+    reg_param (optional) - the regularisation strength. If provided, then
+        regularised least squares fitting is uses with this regularisation
+        strength. Otherwise, (non-regularised) least squares is used.
+
+    returns
+    -------
+    train_error - the training error for the approximation
+    test_error - the test error for the approximation
+    """
+    # get the train test split
+    train_part, test_part = train_and_test_split(
+        inputs.shape[0], test_fraction=test_fraction)
+    # break the data into train and test parts
+    train_inputs, train_targets, test_inputs, test_targets = \
+        train_and_test_partition(inputs, targets, train_part, test_part)
+    # now train and evaluate the error on both sets
+    train_error, test_error = train_and_test(
+        train_inputs, train_targets, test_inputs, test_targets,
+        reg_param=0.1)
+    return train_error, test_error    
+
+def train_and_test_split(N, test_fraction=None):
+    """
+    Randomly generates a train/test split for data of size N.
+
+    parameters
+    ----------
+    N - the dataset size
+    test_fraction - a fraction (between 0 and 1) specifying the proportion of
+        the data to use as test data.
+    """
+    if test_fraction is None:
+        test_fraction = 0.1
+    p = [test_fraction,(1-test_fraction)]
+    train_part = np.random.choice([False,True],size=N, p=p)
+    test_part = np.invert(train_part)
+    return train_part, test_part 
+
+def train_and_test_partition(inputs, targets, train_part, test_part):
+    """
+    Splits a data matrix (or design matrix) and associated targets into train
+    and test parts.
+
+    parameters
+    ----------
+    inputs - a 2d numpy array whose rows are the datapoints, or can be a design
+        matric, where rows are the feature vectors for data points.
+    targets - a 1d numpy array whose elements are the targets.
+    train_part - A list (or 1d array) of N booleans, where N is the number of
+        data points. If the ith element is true then the ith data point will be
+        added to the training data.
+    test_part - (like train_part) but specifying the test points.
+
+    returns
+    -------     
+    train_inputs - the training input matrix
+    train_targets - the training targets
+    test_inputs - the test input matrix
+    test_targets - the test targtets
+    """
+    # get the indices of the train and test portion
+    train_inputs = inputs[train_part,:]
+    test_inputs = inputs[test_part,:]
+    train_targets = targets[train_part]
+    test_targets = targets[test_part]
+    return train_inputs, train_targets, test_inputs, test_targets   
+
+def train_and_test(
+        train_inputs, train_targets, test_inputs, test_targets, reg_param=None):
+    """
+    Will fit a linear model with either least squares, or regularised least 
+    squares to the training data, then evaluate on both test and training data
+
+    parameters
+    ----------
+    train_inputs - the input design matrix for training
+    train_targets - the training targets as a vector
+    test_inputs - the input design matrix for testing
+    test_targets - the test targets as a vector
+    reg_param (optional) - the regularisation strength. If provided, then
+        regularised maximum likelihood fitting is uses with this regularisation
+        strength. Otherwise, (non-regularised) least squares is used.
+
+    returns
+    -------
+    train_error - the training error for the approximation
+    test_error - the test error for the approximation
+    """
+    # Find the optimal weights (depends on regularisation)
+    if reg_param is None:
+        # use simple least squares approach
+        weights = ml_weights(
+            train_inputs, train_targets)
+    else:
+        # use regularised least squares approach
+        weights = regularised_ml_weights(
+          train_inputs, train_targets,  reg_param)
+    # predictions are linear functions of the inputs, we evaluate those here
+    train_predicts = linear_model_predict(train_inputs, weights)
+    test_predicts = linear_model_predict(test_inputs, weights)
+    # evaluate the error between the predictions and true targets on both sets
+    train_error = root_mean_squared_error(train_targets, train_predicts)
+    test_error = root_mean_squared_error(test_targets, test_predicts)
+    return train_error, test_error
+
+def ml_weights(inputmtx, targets):
+    """
+    This method returns the weights that give the best linear fit between
+    the processed inputs and the targets.
+    """
+    Phi = np.matrix(inputmtx)
+    targets = np.matrix(targets).reshape((len(targets),1))
+    weights = linalg.inv(Phi.transpose()*Phi)*Phi.transpose()*targets
+    return np.array(weights).flatten()
+
+def linear_model_predict(designmtx, weights):
+    ys = np.matrix(designmtx)*np.matrix(weights).reshape((len(weights),1))
+    return np.array(ys).flatten()
+
+def root_mean_squared_error(y_true, y_pred):
+    """
+    Evaluate how closely predicted values (y_pred) match the true values
+    (y_true, also known as targets)
+
+    Parameters
+    ----------
+    y_true - the true targets
+    y_pred - the predicted targets
+
+    Returns
+    -------
+    mse - The root mean squared error between true and predicted target
+    """
+    N = len(y_true)
+    # be careful, square must be done element-wise (hence conversion
+    # to np.array)
+    mse = np.sum((np.array(y_true).flatten() - np.array(y_pred).flatten())**2)/N
+    return np.sqrt(mse)
+
+def regularised_ml_weights(
+        inputmtx, targets, reg_param):
+    """
+    This method returns the weights that give the best linear fit between
+    the processed inputs and the targets penalised by some regularisation term
+    (reg_param)
+    """
+    Phi = np.matrix(inputmtx)
+    targets = np.matrix(targets).reshape((len(targets),1))
+    I = np.identity(Phi.shape[1])
+    weights = linalg.inv(reg_param*I + Phi.transpose()*Phi)*Phi.transpose()*targets
+    return np.array(weights).flatten()
+   
+def plot_train_test_errors(
+        control_var, experiment_sequence, train_errors, test_errors):
+    """
+    Plot the train and test errors for a sequence of experiments.
+
+    parameters
+    ----------
+    control_var - the name of the control variable, e.g. degree (for polynomial)
+        degree.
+    experiment_sequence - a list of values applied to the control variable.
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    train_line, = ax.plot(experiment_sequence, train_errors,'b-')
+    test_line, = ax.plot(experiment_sequence, test_errors, 'r-')
+    ax.set_xlabel(control_var)
+    ax.set_ylabel("$E_{RMS}$")
+    ax.legend([train_line, test_line], ["train", "test"], loc=1)
+    return fig, ax
+
+def create_cv_folds(N, num_folds):
+    """
+    Defines the cross-validation splits for N data-points into num_folds folds.
+    Returns a list of folds, where each fold is a train-test split of the data.
+    Achieves this by partitioning the data into num_folds (almost) equal
+    subsets, where in the ith fold, the ith subset will be assigned to testing,
+    with the remaining subsets assigned to training.
+
+    parameters
+    ----------
+    N - the number of datapoints
+    num_folds - the number of folds
+
+    returns
+    -------
+    folds - a sequence of num_folds folds, each fold is a train and test array
+        indicating (with a boolean array) whether a datapoint belongs to the
+        training or testing part of the fold.
+        Each fold is a (train_part, test_part) pair where:
+
+        train_part - a boolean vector of length N, where if ith element is
+            True if the ith data-point belongs to the training set, and False if
+            otherwise.
+        test_part - a boolean vector of length N, where if ith element is
+            True if the ith data-point belongs to the testing set, and False if
+            otherwise.
+    """
+    # if the number of datapoints is not divisible by folds then some parts
+    # will be larger than others (by 1 data-point). min_part is the smallest
+    # size of a part (uses integer division operator //)
+    min_part = N//num_folds
+    # rem is the number of parts that will be 1 larger
+    rem = N % num_folds
+    # create an empty array which will specify which part a datapoint belongs to 
+    parts = np.empty(N, dtype=int)
+    start = 0
+    for part_id in range(num_folds):
+        # calculate size of the part
+        n_part = min_part
+        if part_id < rem:
+            n_part += 1
+        # now assign the part id to a block of the parts array
+        parts[start:start+n_part] = part_id*np.ones(n_part)
+        start += n_part
+    # now randomly reorder the parts array (so that each datapoint is assigned
+    # a random part.
+    np.random.shuffle(parts)
+    # we now want to turn the parts array, into a sequence of train-test folds
+    folds = []
+    for f in range(num_folds):
+        train = (parts != f)
+        test = (parts == f)
+        folds.append((train,test))
+    return folds
+
 def cv_evaluate_reg_param(inputs, targets, folds, reg_params=None):
     """
       Evaluate then plot the performance of different regularisation parameters
@@ -295,41 +550,6 @@ def cv_evaluation_linear_model(
         test_errors[f] = test_error
     return train_errors, test_errors
 
-def plot_linear_approx(i, inputs, field_names,targets):
-    
-    ''' 
-    i = the attribute column number 
-    
-    '''
-    
-    degree = 1
-    
-    attribute = inputs[:,i]
-    field_name_i = field_names[i]
-    
-    # convert our inputs into a matrix where each row
-    # is a vector of monomials of the corresponding input
-    processed_inputs = expand_to_monomials(attribute, degree)
-    #
-    # find the weights that fit the data in a least squares way
-    weights = ml_weights(processed_inputs, targets)
-    # use weights to create a function that takes inputs and returns predictions
-    # in python, functions can be passed just like any other object
-    # those who know MATLAB might call this a function handle
-    linear_approx = construct_polynomial_approx(degree, weights)
-    fig, ax = plot_function_data_and_approximation(
-        linear_approx, attribute, targets)
-    ax.legend(['data', 'linear approx'])
-    ax.set_xlabel(field_name_i)
-    ax.set_ylabel('Quality')
-    ax.set_title('A simple linear approximation of \n how quality changes with {}'.format(field_name_i))
-    ax.set_ylim( 2.5, 8.5 )
-    #ax.set_xticks([])
-    #ax.set_yticks([])
-    fig.tight_layout()
-    
-    return fig,ax
-
 # this is the feature mapping for a polynomial of given degree in 1d
 def expand_to_monomials(inputs, degree):
     """
@@ -346,117 +566,6 @@ def expand_to_monomials(inputs, degree):
     for i in range(degree+1):
         expanded_inputs.append(inputs**i)
     return np.array(expanded_inputs).transpose()
-
-def plot_function_and_data(inputs, targets, markersize=5, **kwargs):
-    """
-    Plot a function and some associated regression data in a given range
-
-    parameters
-    ----------
-    inputs - the input data
-    targets - the targets
-    markersize (optional) - the size of the markers in the plotted data
-    <for other optional arguments see plot_function>
-
-    returns
-    -------
-    fig - the figure object for the plot
-    ax - the axes object for the plot
-    lines - a list of the line objects on the plot
-    """
-    #fig, ax, lines = plot_function(true_func)
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    ax.plot(inputs, targets, 'bo', markersize=markersize)
-    return fig, ax
-
-def plot_function_data_and_approximation(
-        predict_func, inputs, targets, linewidth=3, xlim=None,
-        **kwargs):
-    """
-    Plot a function, some associated regression data and an approximation
-    in a given range
-
-    parameters
-    ----------
-    predict_func - the approximating function
-    inputs - the input data
-    targets - the targets
-    <for optional arguments see plot_function_and_data>
-
-    returns
-    -------
-    fig - the figure object for the plot
-    ax - the axes object for the plot
-    lines - a list of the line objects on the plot
-    """
-    if xlim is None:
-        xlim = (0,1)
-    fig, ax = plot_function_and_data(
-        inputs, targets, linewidth=linewidth, xlim=xlim, **kwargs)
-    xs = np.linspace(min(inputs), max(inputs), 101)
-    ys = predict_func(xs)
-    ax.plot(xs, ys, 'r-', linewidth=linewidth)
-    return fig, ax
-
-def evaluate_linear_approx(inputs, targets, test_fraction):
-    '''
-    This evaluates the linear performance of the data. 
-    This takes in an input variable of runs - this is the number of times the errors are calculated for each reg param,
-        this is then averaged and the mean is plot, therefore producing a smooth and accurate curve.
-    '''
-    # the linear performance
-    reg_params = np.logspace(-15,-4, 11)
-    train_errors = []
-    test_errors = []
-    
-    # plot the average for a number of runs
-    for reg_param in reg_params:
-        #print("Evaluating reg_para " + str(reg_param))
-        train_error, test_error = simple_evaluation_linear_model(
-            inputs, targets, test_fraction=test_fraction, reg_param=reg_param)
-        train_errors.append(train_error)
-        test_errors.append(test_error)
-        # once errors calculated for no. of runs, calculate average, append and clear array for next reg param
-    
-    fig , ax = plot_train_test_errors(
-        "$\lambda$", reg_params, train_errors, test_errors)
-    # we also want to plot a straight line showing the linear performance
-    xlim = ax.get_xlim()
-    #test, = ax.plot(xlim, test_error*np.ones(2), ':g', label='test')
-    #ax.legend([train_line, test_line, test], ["train", "test", "test error"], loc=1)
-    ax.set_xscale('log')
-    
-    print("Linear Regression:")
-    print("\t(train_error, test_error) = %r" % ((train_error, test_error),))
-    return train_errors, test_errors, fig, ax
-
-def plot_train_test_errors(
-        control_var, experiment_sequence, train_errors, test_errors):
-    """
-    Plot the train and test errors for a sequence of experiments.
-
-    parameters
-    ----------
-    control_var - the name of the control variable, e.g. degree (for polynomial)
-        degree.
-    experiment_sequence - a list of values applied to the control variable.
-    """
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    train_line, = ax.plot(experiment_sequence, train_errors,'b-')
-    test_line, = ax.plot(experiment_sequence, test_errors, 'r-')
-    ax.set_xlabel(control_var)
-    ax.set_ylabel("$E_{RMS}$")
-    ax.legend([train_line, test_line], ["train", "test"], loc=1)
-    return fig, ax
-
-def predict_wine(x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,theta):
-    x_i = sp.matrix([x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11])
-    x_n = (x_i - np.mean(x_i))/np.std(x_i) # normalise
-    x = sp.hstack((sp.matrix([1]), x_n))
-    quality = (x * theta.T)
-    print ("Prediction using Gradient Descent: \n    Quality of wine with fixed acidity {}, volitile acidity {}, citric acid {}, residual sugar {}, chlorides {}, free sulfur dioxide {}, total sulfur dioxide {}, density {}, pH {}, sulphates {} and alcohol {} has a predicted quality of {}".format(x1, x2, x3,x4,x5,x6,x7,x8,x9,x10,x11,quality))
 
 def gradientDescent(X, y, theta2, alpha, iters):
     
