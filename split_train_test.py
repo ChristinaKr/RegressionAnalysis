@@ -55,4 +55,4 @@ def split_data(ifname, delimiter=None, has_header=False, columns=None, seed=42, 
     training_data_as_array = np.array(training_data).astype(float)
     test_data_as_array = np.array(test_data).astype(float)
     # return the two data sets to caller
-    return training_data_as_array, test_data_as_array
+    return training_data_as_array, test_data_as_array, field_names
