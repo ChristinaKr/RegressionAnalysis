@@ -151,7 +151,7 @@ def linear_model_predict(designmtx, weights):
 
 
 def plot_data_and_approximation(
-        predict_func, inputs, targets, linewidth=3, xlim=None,
+        ys, inputs, targets, linewidth=3, xlim=None,
         **kwargs):
     """
     Plot a function, some associated regression data and an approximation
@@ -175,13 +175,11 @@ def plot_data_and_approximation(
         xlim = (0,1)
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    xs = np.linspace(xlim[0], xlim[1], 101)
-    ax.set_xlim(xlim[0], xlim[1])
+    #ax.set_xlim(xlim[0], xlim[1])
     ax.set_ylim(0.5, 8.5) 
     
     line, = ax.plot(inputs, targets, 'bo')
-    ys = predict_func(xs)
-    line, = ax.plot(xs, ys, 'r-', linewidth=linewidth)
+    line, = ax.plot(inputs, ys, 'r-', linewidth=linewidth)
     return fig, ax, [line]
            
 
@@ -407,78 +405,98 @@ def evaluate_rbf_for_various_reg_params(
             designmtx, targets, test_fraction=test_fraction, reg_param=reg_param)
         train_errors.append(train_error)
         test_errors.append(test_error)
-
+    
     fig , ax = plot_train_test_errors(
         "$\lambda$", reg_params, train_errors, test_errors)
     # we also want to plot a straight line showing the linear performance
     xlim = ax.get_xlim()
+    fig.suptitle('Varying the regularisation parameter with scale = 1')
     ax.plot(xlim, test_error_linear*np.ones(2), 'g:')
     ax.set_xscale('log')
-
-def parameter_search_rbf(inputs, targets, test_fraction, sample_fraction=0.1):
+      
+def parameter_search_with_centres_rbf(inputs, targets, test_fraction):
     """
     """
     N = inputs.shape[0]
     # run all experiments on the same train-test split of the data 
-    train_part, test_part = train_and_test_split(N, test_fraction=test_fraction)
+    train_part, test_part = train_and_test_split(N, test_fraction=test_fraction)    
+    
+    centres_set = []
+    centres_fraction = np.linspace(0.05, 0.5, 10)
 
-    #sample_fraction = 0.1
-    p = (1-sample_fraction,sample_fraction)
-    centres = inputs[np.random.choice([False,True], size=N, p=p),:]
-    print("centres.shape = %r" % (centres.shape,))
-    scales = np.logspace(0,5, 20) # of the basis functions
-    reg_params = np.logspace(-15,-6, 20) # choices of regularisation strength
+    for i, sample_fraction in enumerate(centres_fraction):
+        p = (1-sample_fraction,sample_fraction)
+        centres = inputs[np.random.choice([False,True], size=N, p=p),:]
+        centres_set.append(centres)
+    
+    centres_set = np.array(centres_set)
+    
+    scales = np.logspace(0,5, 15) # of the basis functions
+    reg_params = np.logspace(-11,-3, 15) # choices of regularisation strength
     # create empty 2d arrays to store the train and test errors
-    train_errors = np.empty((scales.size,reg_params.size))
-    test_errors = np.empty((scales.size,reg_params.size))
-    # iterate over the scales
-    for i,scale in enumerate(scales):
-        # i is the index, scale is the corresponding scale
-        # we must recreate the feature mapping each time for different scales
-        feature_mapping = construct_rbf_feature_mapping(centres,scale)
-        designmtx = feature_mapping(inputs)
-        # partition the design matrix and targets into train and test
-        train_designmtx, train_targets, test_designmtx, test_targets = \
-            train_and_test_partition(
-                designmtx, targets, train_part, test_part)
-        # iteratre over the regularisation parameters
-        for j, reg_param in enumerate(reg_params):
-            # j is the index, reg_param is the corresponding regularisation
-            # parameter
-            # train and test the data
-            train_error, test_error = train_and_test(
-                train_designmtx, train_targets, test_designmtx, test_targets,
-                reg_param=reg_param)
-            # store the train and test errors in our 2d arrays
-            train_errors[i,j] = train_error
-            test_errors[i,j] = test_error
+    train_errors = np.empty((centres_set.size, scales.size,reg_params.size))
+    test_errors = np.empty((centres_set.size, scales.size,reg_params.size))
+    
+    #iterate over centres
+    for i,centres in enumerate(centres_set): 
+        # iterate over the scales
+        for j,scale in enumerate(scales):
+            # i is the index, scale is the corresponding scale
+            # we must recreate the feature mapping each time for different scales
+            feature_mapping = construct_rbf_feature_mapping(centres,scale)
+            designmtx = feature_mapping(inputs)
+            # partition the design matrix and targets into train and test
+            train_designmtx, train_targets, test_designmtx, test_targets = \
+                train_and_test_partition(
+                    designmtx, targets, train_part, test_part)
+            # iteratre over the regularisation parameters
+            for k, reg_param in enumerate(reg_params):
+                # j is the index, reg_param is the corresponding regularisation
+                # parameter
+                # train and test the data
+                train_error, test_error = train_and_test(
+                    train_designmtx, train_targets, test_designmtx, test_targets,
+                    reg_param=reg_param)
+                # store the train and test errors in our 2d arrays
+                train_errors[i,j,k] = train_error
+                test_errors[i,j,k] = test_error
     
     # we have a 2d array of train and test errors, we want to know the (i,j)
     # index of the best value
-    best_i = math.floor(np.argmin(test_errors)/test_errors.shape[0])
+    best_i = math.floor(np.argmin(test_errors)/(test_errors.shape[1]*test_errors.shape[2]))
+    best_j = math.floor(np.argmin(test_errors[best_i, :, :])/(test_errors[best_i, :, :]).shape[1])
+    best_k = np.argmin(test_errors[best_i, best_j,:])
     
-    #best_i = np.argmin(np.argmin(test_errors,axis=1))
-    best_j = np.argmin(test_errors[i,:])
     print("Best joint choice of parameters:")
     print(
-        "\tscale %.2g and lambda = %.2g" % (scales[best_i],reg_params[best_j]))
+        "\tscale %.2g ; lambda = %.2g ; centres proportion %.2g" % (scales[best_j],reg_params[best_k], centres_fraction[best_i]))
+    print("min test error rbf = %r" % np.min(test_errors))
     # now we can plot the error for different scales using the best
-    # regulariation choice
+    # regulariation and centres choice
     fig , ax = plot_train_test_errors(
-        "scale", scales, train_errors[:,best_j], test_errors[:,best_j])
+        "scale", scales, train_errors[best_i,:,best_k], test_errors[best_i,:,best_k])
     ax.set_xscale('log')
-    fig.suptitle('Error for different scales using the best regulariation choice')
-    plt.axvline(x=scales[best_i])
+    ax.set_ylim([0,1])
+    fig.suptitle('Error for different scales using the best regulariation and centres choice')
+    plt.axvline(x=scales[best_j])
+    
     # ...and the error for different regularisation choices given the best
     # scale choice 
     fig , ax = plot_train_test_errors(
-        "$\lambda$", reg_params, train_errors[best_i,:], test_errors[best_i,:])
+        "$\lambda$", reg_params, train_errors[best_i,best_j,:], test_errors[best_i,best_j,:])
     ax.set_xscale('log')
-    fig.suptitle('Error for different regularisation choices given the best scale choice')
-    plt.axvline(x=reg_params[best_j])
-
-    return scales[best_i], reg_params[best_j], centres 
-  
+    ax.set_ylim([0.3,1])
+    fig.suptitle('Error for different regularisation choices given the best scale and centres choice')
+    plt.axvline(x=reg_params[best_k])
+    
+    #Plot error for varying number of features given best regularisation and scales choice
+    fig , ax = plot_train_test_errors(
+        "p", centres_fraction, train_errors[:,best_j,best_k], test_errors[:,best_j,best_k])
+    fig.suptitle('Error for varying number of features given the best scale and lambda choice')
+    plt.axvline(x=centres_fraction[best_i])
+    
+    return centres_fraction[best_i], scales[best_j], reg_params[best_k], centres_set[best_i]
+    
 def exploratory_plots(data, field_names=None):
     # the number of dimensions in the data
     dim = data.shape[1]
@@ -509,6 +527,8 @@ def exploratory_plots(data, field_names=None):
             plot_id += 1
     plt.tight_layout()  
   
+  
+  
 def main(ifname):
     data, field_names = import_data(ifname)
     if type(data) == np.ndarray:
@@ -518,12 +538,10 @@ def main(ifname):
     data1 = data[:, [0,1,2,3,11]]
     data2 = data[:, [4,5,6,7,11]]
     data3 = data[:, [8,9,10,11]]
-
     
     exploratory_plots(data1, ['facid','vacid','cacid', 'rsug','q'])
     exploratory_plots(data2, ['cl','fsul','tsul', 'd','q'])
     exploratory_plots(data3, ['ph','sulp','alc','q'])
-    
     
     targets = data[:,11] #Quality of the wine
     #data_Matrix = np.delete(data,11,1)
@@ -568,82 +586,75 @@ def main(ifname):
     inputs[:,9] = (sulphates_inputs - np.mean(sulphates_inputs))/np.std(sulphates_inputs)
     inputs[:,10] = (alcohol_inputs - np.mean(alcohol_inputs))/np.std(alcohol_inputs)
     
-    test_fraction = 0.25
+    test_fraction = 0.1
     
-    train_error_linear, test_error_linear = evaluate_linear_approx(inputs, targets, test_fraction)
-    evaluate_rbf_for_various_reg_params(inputs, targets, test_fraction, test_error_linear)
     #Find the best scales and regularisation parameter 
-    best_scale, best_regparam, centres =  parameter_search_rbf(inputs, targets, test_fraction, sample_fraction=0.4)
+   
+    best_feature_proportion, best_scale, best_regparam, centres = parameter_search_with_centres_rbf(inputs, targets, test_fraction) 
     
     plt.show()
     
+    ##BAYESIAN
     
-
-    # create the feature mapping
     feature_mapping = construct_rbf_feature_mapping(centres, best_scale)  
-    
     designmtx = feature_mapping(inputs)
-    
     # the number of features is the width of this matrix
     M = designmtx.shape[1]
     # define a prior mean and covariance matrix
     m0 = np.zeros(M)
-    alpha = 100
-    S0 = alpha * np.identity(M)
+    
     # define the noise precision of our data
-    beta = 10000000
-    # find the posterior over weights 
-    mN, SN = calculate_weights_posterior(designmtx, targets, beta, m0, S0)
-    # the posterior mean (also the MAP) gives the central prediction
-    mean_approx = construct_feature_mapping_approx(feature_mapping, mN)#prediciton function
+    beta = 1/np.var(targets)
+    print("beta = %r" % (beta,))
+ 
     
-    # Input variables:
-    # i =
-    # 0 - fixed_acidity; 1-volatile_acidity; 2 - citric_acid; 
-    # 3 - residual_sugar; 4 - chlorides; 5 -  free_sulfur;
-    # 6 - total_sulfur_dioxide; 7 - density; 8 - pH;
-    # 9 - sulphates; 10 - alcohol  
-    v = 0
-    changing_parameter = inputs[:,v]
-    field_name = field_names[v]
+    #Split into train and test parts
+    train_part, test_part = train_and_test_split(N, test_fraction=0.1)
     
-    fig, ax, lines = plot_data_and_approximation(
-        mean_approx, changing_parameter, targets, xlim=[np.min(changing_parameter), np.max(changing_parameter)])
-    ax.set_xlabel(field_name);
-    ax.set_ylabel("Quality");
+    train_inputs, train_targets, test_inputs, test_targets = train_and_test_partition(inputs, targets, train_part, test_part)
+    
+    train_designmtx, train_targets, test_designmtx, test_targets = \
+                train_and_test_partition(
+                    designmtx, targets, train_part, test_part)
+       
+    bayesian_train_errors=[]
+    bayesian_test_errors=[]
+    alphas = np.logspace(-1,5, 10)
+    for i, alpha in enumerate(alphas):
+    
+        S0 = alpha * np.identity(M)
+       
+        # find the posterior over weights 
+        mN, SN = calculate_weights_posterior(train_designmtx, train_targets, beta, m0, S0)
+        # the posterior mean (also the MAP) gives the central prediction
+        mean_approx = construct_feature_mapping_approx(feature_mapping, mN)#prediciton function
+    
+        #Now to see how it performs on test data
+        ys, sigma2Ns = predictive_distribution(test_designmtx, beta, mN, SN)    
+        lower = ys-np.sqrt(sigma2Ns)
+        upper = ys+np.sqrt(sigma2Ns)
         
+        train_predic = mean_approx(train_inputs)   
+        train_error = root_mean_squared_error(train_targets, train_predic)
+        test_error = root_mean_squared_error(test_targets, ys)
+        #print("bayesian train_error = %r"%(train_error,))
+        #print("bayesian test_error = %r"%(test_error,))
+        bayesian_train_errors.append(train_error)
+        bayesian_test_errors.append(test_error)
     
-    #now for the predictive distribuiton
-    new_inputs = np.array([])
+    bayesian_test_errors = np.array(bayesian_test_errors)
+    bayesian_train_errors = np.array(bayesian_train_errors)
     
-    for j in range (0, 11):
-        new_column = np.array([])
-        if j == v:
-            new_column = np.linspace(np.min(changing_parameter), np.max(changing_parameter), 50)
-            print(new_column)
-        else:
-            new_variable = np.mean(inputs[:,j])
-            for i in range (0, 50):
-                new_column = np.append(new_column, new_variable)       
-        if j == 0:
-            new_inputs = new_column
-        else:
-            new_inputs = np.column_stack((new_inputs, new_column))
+    best_i = np.argmin(bayesian_test_errors)
     
-    new_designmtx = feature_mapping(new_inputs)
-    ys, sigma2Ns = predictive_distribution(new_designmtx, beta, mN, SN)
-    print("sigma2Ns = %r" % (sigma2Ns,))
-   
-    fig1 = plt.figure()
-    ax1 = fig1.add_subplot(1,1,1)
-    ax1.plot(new_inputs[:,v], ys, 'r', linewidth=3)
-    ax1.scatter(changing_parameter, targets)
-    ax1.set_xlabel(field_name);
-    ax1.set_ylabel("Quality");
-
-    lower = ys-np.sqrt(sigma2Ns)
-    upper = ys+np.sqrt(sigma2Ns)
-    ax1.fill_between(new_inputs[:,v], lower, upper, alpha=0.2, color='r')
+    print("best alpha = %r"% (alphas[best_i],))
+    print("min bayesian test_error = %r"%(np.min(bayesian_test_errors),))
+    fig , ax = plot_train_test_errors(
+        "alpha", alphas, bayesian_train_errors, bayesian_test_errors)
+    ax.set_xscale('log')
+    ax.set_ylim([0,2])
+    fig.suptitle('Error for different choices of alpha')
+    fig.savefig("bayesian_regression_rbf_varying_alpha.pdf", fmt="pdf")
     plt.show()
         
         
@@ -651,9 +662,9 @@ if __name__ == '__main__':
     import sys
     # this allows you to pass the file name as the first argument when you call
     # your script from the command line
-    try:
-        main(sys.argv[1])
-    except IndexError:
-        print(
-            "[ERROR] Please give the data-file location as the first argument.")
+    #try:
+    main(sys.argv[1])
+    #except IndexError:
+     #   print(
+      #      "[ERROR] Please give the data-file location as the first argument.")
 
