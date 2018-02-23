@@ -298,6 +298,7 @@ def cv_evaluation_linear_model(
     for f,fold in enumerate(folds):
         # f is the fold id, fold is the train-test split
         train_part, test_part = fold
+        
         # break the data into train and test sets
         train_inputs, train_targets, test_inputs, test_targets = \
             train_and_test_partition(inputs, targets, train_part, test_part)
@@ -422,12 +423,10 @@ def plot_train_test_errors(
     ax.legend([train_line, test_line], ["train", "test"])
     return fig, ax
   
-def parameter_search_with_centres_rbf(inputs, targets, test_fraction, folds):
+def parameter_search_with_centres_rbf(inputs, targets, folds):
     """
     """
-    N = inputs.shape[0]
-    # run all experiments on the same train-test split of the data 
-    train_part, test_part = train_and_test_split(N, test_fraction=test_fraction)    
+    N = inputs.shape[0]    
     
     centres_set = []
     centres_fraction = np.linspace(0.05, 0.5, 10)
@@ -457,10 +456,8 @@ def parameter_search_with_centres_rbf(inputs, targets, test_fraction, folds):
             # we must recreate the feature mapping each time for different scales
             feature_mapping = construct_rbf_feature_mapping(centres,scale)
             designmtx = feature_mapping(inputs)
-            # partition the design matrix and targets into train and test
-            train_designmtx, train_targets, test_designmtx, test_targets = \
-                train_and_test_partition(
-                    designmtx, targets, train_part, test_part)
+            # partition the design matrix and targets into train and test   
+            
             # iteratre over the regularisation parameters
             for k, reg_param in enumerate(reg_params):
                 # train and test the data
@@ -493,7 +490,7 @@ def parameter_search_with_centres_rbf(inputs, targets, test_fraction, folds):
     print("Best joint choice of parameters:")
     print(
         "\tscale %.2g ; lambda = %.2g ; centres proportion %.2g" % (scales[best_j],reg_params[best_k], centres_fraction[best_i]))
-    print("min mean test error rbf = %r" % np.min(test_errors_means))
+    print("rbf min mean test error during cross validation = %r" % np.min(test_errors_means))
     # train error bars
     lower_train = train_errors_means - train_stdev_errors/np.sqrt(num_folds)
     upper_train = train_errors_means + train_stdev_errors/np.sqrt(num_folds)
@@ -624,25 +621,29 @@ def create_folds(N, num_folds):
   
 def main(ifname):
     data, field_names = import_data(ifname)
-    if type(data) == np.ndarray:
-        print("Data array loaded: there are %d rows" % data.shape[0])
-        print ("first row:", data[0,:])
-        
-    #test_data, training_data, field_names = split_data(ifname, delimiter=';', has_header=True, seed=42, fraction=0.15)
-    
+    #if type(data) == np.ndarray:
+    #    print("Data array loaded: there are %d rows" % data.shape[0])
+    #    print ("first row:", data[0,:])
+          
+    test_fraction = 0.1
+    # Import data and split into train and test parts
+    training_data, test_data, field_names = split_data(ifname, delimiter=';', has_header=True,seed=42, fraction=test_fraction)
+    training_targets = training_data[:,11] #Quality of the wine
+    test_targets = test_data[:,11]
+    training_inputs = training_data[:, [0,1,2,3,4,5,6,7,8,9,10]]
+    test_inputs = test_data[:, [0,1,2,3,4,5,6,7,8,9,10]]
+     
     data1 = data[:, [0,1,2,3,11]]
     data2 = data[:, [4,5,6,7,11]]
     data3 = data[:, [8,9,10,11]]
     
-    exploratory_plots(data1, ['facid','vacid','cacid', 'rsug','q'])
-    exploratory_plots(data2, ['cl','fsul','tsul', 'd','q'])
+    exploratory_plots(data1, ['f_acid','v_acid','c_acid', 'r_sug','q'])
+    exploratory_plots(data2, ['cl','f_sul','t_sul', 'd','q'])
     exploratory_plots(data3, ['ph','sulp','alc','q'])
     
     targets = data[:,11] #Quality of the wine
 
     inputs = data[:, [0,1,2,3,4,5,6,7,8,9,10]]
-    
-    N = data.shape[0]
     
     fixed_acidity_inputs = inputs[:,0]
     volatile_acidity_inputs = inputs[:,1]
@@ -680,61 +681,64 @@ def main(ifname):
     inputs[:,8] = (pH_inputs - np.mean(pH_inputs))/np.std(pH_inputs)
     inputs[:,9] = (sulphates_inputs - np.mean(sulphates_inputs))/np.std(sulphates_inputs)
     inputs[:,10] = (alcohol_inputs - np.mean(alcohol_inputs))/np.std(alcohol_inputs)
-    
-    test_fraction = 0.1
-    
-    #Find the best scales and regularisation parameter 
    
-   
+    #### RBF model #####
+    
     # get the cross-validation folds
     num_folds = 5
+    N = training_data.shape[0]
     folds = create_folds(N, num_folds)
    
-    best_feature_proportion, best_scale, best_regparam, centres = parameter_search_with_centres_rbf(inputs, targets, test_fraction, folds) 
+    # Find the paramaters for number of centres/features, scale and reg param
+    # that best fits training data: 
+    best_feature_proportion, best_scale, best_regparam, centres = \
+        parameter_search_with_centres_rbf(training_inputs, training_targets, folds) 
     
-    plt.show()
+    # Now evaluate error on test data using optimized parameter 
+    # produced by training data:
+    feature_mapping = construct_rbf_feature_mapping(centres, best_scale)
+    designmtx = feature_mapping(training_inputs)
     
-    ##BAYESIAN
+    weights = regularised_ml_weights(designmtx, training_targets,  best_regparam)
     
-    feature_mapping = construct_rbf_feature_mapping(centres, best_scale)  
-    designmtx = feature_mapping(inputs)
-    # the number of features is the width of this matrix
+    test_designmtx = feature_mapping(test_inputs)
+    test_predicts = linear_model_predict(test_designmtx, weights)
+    # Evaluate the error between the predictions and true targets on both sets
+    test_error = root_mean_squared_error(test_targets, test_predicts)
+    print("final: rbf test error = %r"%(test_error,))
+    
+    #### BAYESIAN analysis ####
+    
+    # the number of features is the width of the design matrix
     M = designmtx.shape[1]
-    # define a prior mean and covariance matrix
+    # Define a prior mean
     m0 = np.zeros(M)
     
     # define the noise precision of our data
     beta = 1/np.var(targets)
-    print("beta = %r" % (beta,))
+    print("beta = %r" % (beta,))   
+
+    # Try different values of alpha for the prior covariance matrix
+    alphas = np.logspace(-1,6, 10)
     
-    #Split into train and test parts
-    train_part, test_part = train_and_test_split(N, test_fraction=0.1)
-    
-    train_inputs, train_targets, test_inputs, test_targets = train_and_test_partition(inputs, targets, train_part, test_part)
-    
-    train_designmtx, train_targets, test_designmtx, test_targets = \
-                train_and_test_partition(
-                    designmtx, targets, train_part, test_part)
-       
     bayesian_train_errors=[]
     bayesian_test_errors=[]
-    alphas = np.logspace(-1,5, 10)
     for i, alpha in enumerate(alphas):
-    
+        # Covariance prior:
         S0 = alpha * np.identity(M)
-       
+    
         # find the posterior over weights 
-        mN, SN = calculate_weights_posterior(train_designmtx, train_targets, beta, m0, S0)
+        mN, SN = calculate_weights_posterior(designmtx, training_targets, beta, m0, S0)
         # the posterior mean (also the MAP) gives the central prediction
         mean_approx = construct_feature_mapping_approx(feature_mapping, mN)#prediciton function
     
-        #Now to see how it performs on test data
+        # Now to see how it performs on test data
         ys, sigma2Ns = predictive_distribution(test_designmtx, beta, mN, SN)    
         lower = ys-np.sqrt(sigma2Ns)
         upper = ys+np.sqrt(sigma2Ns)
         
-        train_predic = mean_approx(train_inputs)   
-        train_error = root_mean_squared_error(train_targets, train_predic)
+        train_predic = mean_approx(training_inputs)   
+        train_error = root_mean_squared_error(training_targets, train_predic)
         test_error = root_mean_squared_error(test_targets, ys)
         bayesian_train_errors.append(train_error)
         bayesian_test_errors.append(test_error)
@@ -743,7 +747,7 @@ def main(ifname):
     bayesian_train_errors = np.array(bayesian_train_errors)
     
     print("best alpha = %r"% (np.argmin(bayesian_test_errors)))
-    print("min bayesian test_error = %r"%(np.min(bayesian_test_errors),))
+    print("bayesian test_error with optimal alpha = %r"%(np.min(bayesian_test_errors),))
     fig , ax = plot_train_test_errors(
         "alpha", alphas, bayesian_train_errors, bayesian_test_errors)
     ax.set_xscale('log')
@@ -757,8 +761,8 @@ if __name__ == '__main__':
     import sys
     # this allows you to pass the file name as the first argument when you call
     # your script from the command line
-    try:
-        main(sys.argv[1])
-    except IndexError:
-        print(
-            "[ERROR] Please give the data-file location as the first argument.")
+    #try:
+    main(sys.argv[1])
+    #except IndexError:
+     #   print(
+      #      "[ERROR] Please give the data-file location as the first argument.")
