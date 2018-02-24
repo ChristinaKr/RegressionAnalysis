@@ -11,27 +11,62 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats.stats import pearsonr   
 
-def import_data(ifname):
+def split_data(ifname, delimiter=None, has_header=False, columns=None, seed=42, fraction=0.15):
     """
-    Imports data with file-name/-path ifname as a numpy array.
+    Imports a tab/comma/semi-colon/... separated data file as an array of
+    floating point numbers.
+
+    parameters
+    ----------
+    ifname -- filename/path of data file.
+    delimiter -- delimiter of data values
+    has_header -- does the data-file have a header line
+    columns -- a list of integers specifying which columns of the file to import
+        (counting from 0)
+    seed -- the seed for the pseudo-random number generator
+
+    returns
+    -------
+    training_data_as_array -- the training data as a numpy.array object
+    test_data_as_array --  the test data as a numpy.array object
     """
+
+    np.random.seed(seed)
+    test_rows = np.unique(np.array(np.random.uniform(size = int(fraction*1599))*1599).astype(int))
+    print(test_rows)
+
+
+
+    if delimiter is None:
+        delimiter = '\t'
     with open(ifname, 'r') as ifile:
-        datareader = csv.reader(ifile, delimiter=';')
-        # we want to avoid importing the header line.
-        # instead we'll print it to screen
-        header = next(datareader)
-        # create an empty list to store each row of data
-        data = []
+        datareader = csv.reader(ifile, delimiter=delimiter)
+        # if the data has a header line we want to avoid trying to import it.
+        if has_header:
+            field_names = next(datareader)
+        # create empty lists to store each row of data
+        training_data = []
+        test_data = []
+        count = 0
         for row in datareader:
-            # for each row of data 
-            # convert each element (from string) to float type
-            row_of_floats = list(map(float,row))
-            # now store in our data list
-            data.append(row_of_floats)
-        # convert the data (list object) into a numpy array.
-        data_as_array = np.array(data)
-        # return this array to caller
-        return data_as_array
+            # for each row of data only take the columns we are interested in
+            if not columns is None:
+                row = [row[c] for c in columns]
+            # now store in our data lists
+            if(count in test_rows):
+                test_data.append(row)
+            else:
+                training_data.append(row)
+            count+=1
+    print("There are %d training entries" % len(training_data))
+    print("There are %d test entries" % len(test_data))
+    print("Each row has %d elements" % len(training_data[0]))
+    # convert the data (list object) into a numpy array.
+    training_data_as_array = np.array(training_data).astype(float)
+    test_data_as_array = np.array(test_data).astype(float)
+    # return the two data sets to caller
+    return training_data_as_array, test_data_as_array
+
   
 def train_and_test_split(N, test_fraction=None, seed=None):
     """
@@ -143,11 +178,13 @@ def construct_knn_approx(train_inputs, train_targets, k, test_inputs, test_targe
     def prediction_function(test_inputs, predictsRounded, predictsNotRounded):
         # Reshape arrays of x-values into 11 x [amount of data points] column vector
         test_inputs = test_inputs.transpose()
-        
+#        print('shape test_inputs', np.shape(test_inputs))
         for i in range(test_inputs.shape[1]):
             test_inputs_col = test_inputs[:, i].reshape(test_inputs[:, i].size,1)
+            
+            
             # Calculates distance between training data points and test data points to predict (11 x 1599)
-            distances = distance(train_inputs, test_inputs_col)
+            distances = distance(train_inputs, test_inputs_col) # train: 11 x 1, test: 11 x 
         
             # Sums up all distances per column (axis = 0), so that there's only 1 distance left per data point
             distanceSum = [np.sum(distances, axis = 0)]
@@ -230,8 +267,9 @@ def correlation_parameters(inputs, data):
         inputCorr[:, b] = inputs[:,indicesHighestCorr[b]]
         b+=1
     
+    
     targetCorr = targets
-    return inputCorr, targetCorr  
+    return inputCorr, targetCorr, indicesHighestCorr 
 
 def error_with_highest_corr_inputs_only(inputCorr, targetCorr, seed=None):  
     if not seed is None:
@@ -274,7 +312,7 @@ def plot_all_inputs_vs_most_correlated_inputs(data, inputCorr, targetCorr):
     ys = corrInputs
     corrInputs_line, = ax.plot(xs, ys, 'g-', linewidth=3)
     ax.set_xlabel("k")
-    ax.set_ylabel("SSEs")
+    ax.set_ylabel("MSE")
     ax.legend([corrInputs_line, allInputs_line],["Highest correlating parameters only", "All 11 input parameters"])
     fig.suptitle('Errors over different values of k run 100 times - Input parameter comparison') 
     plt.show()
@@ -313,7 +351,7 @@ def calculate_and_plot_rounded_vs_unrounded_mse(data):
     ys = SSEsNotRoundedMean
     notRounded_SSE_line, = ax.plot(xs, ys, 'r-', linewidth=3)
     ax.set_xlabel("k")
-    ax.set_ylabel("SSEs")
+    ax.set_ylabel("MSE")
     ax.legend([rounded_SSE_line, notRounded_SSE_line],["rounded predictions", "not rounded predictions"])
     fig.suptitle('Errors over different values of k run 100 times - Rounding comparison') 
     plt.show()
@@ -329,9 +367,99 @@ def calculate_and_plot_rounded_vs_unrounded_mse(data):
     print("The smallest mean error over 100 runs with rounded predictions is", minSSEMeanRounded, "with a k of", optKMeanRounded)
     print("The smallest mean error over 100 runs with unrounded predictions is", minSSEMeanNotRounded, "with a k of", optKMeanNotRounded)
      
+def final_test(data, test):
+    # Final test performed with unseen 15% of data with only highest correlating parameter 
+    test_inputs = test[:,[0,1,2,3,4,5,6,7,8,9,10]]
+    test_targets= test[:,11]
+    
+    train_inputs = data[:,[0,1,2,3,4,5,6,7,8,9,10]]
+    train_targets = data[:,11]
+    
+    # Prepare the training inputs for normalisation
+    fixed_acidity_inputs = train_inputs[:,0]
+    volatile_acidity_inputs = train_inputs[:,1]
+    citric_acid_inputs = train_inputs[:,2]
+    residual_sugar_inputs = train_inputs[:,3]
+    chlorides_inputs = train_inputs[:,4]
+    free_sulfur_dioxide_inputs = train_inputs[:,5]
+    total_sulfur_dioxide_inputs = train_inputs[:,6]
+    density_inputs = train_inputs[:,7]
+    pH_inputs = train_inputs[:,8]
+    sulphates_inputs = train_inputs[:,9]
+    alcohol_inputs = train_inputs[:,10]
+    
+    # Normalise trainings inputs
+    train_inputs[:,0] = (fixed_acidity_inputs - np.mean(fixed_acidity_inputs))/np.std(fixed_acidity_inputs)
+    train_inputs[:,1] = (volatile_acidity_inputs - np.mean(volatile_acidity_inputs))/np.std(volatile_acidity_inputs)
+    train_inputs[:,2] = (citric_acid_inputs - np.mean(citric_acid_inputs))/np.std(citric_acid_inputs)
+    train_inputs[:,3] = (residual_sugar_inputs - np.mean(residual_sugar_inputs))/np.std(residual_sugar_inputs)
+    train_inputs[:,4] = (chlorides_inputs - np.mean(chlorides_inputs))/np.std(chlorides_inputs)
+    train_inputs[:,5] = (free_sulfur_dioxide_inputs - np.mean(free_sulfur_dioxide_inputs))/np.std(free_sulfur_dioxide_inputs)
+    train_inputs[:,6] = (total_sulfur_dioxide_inputs - np.mean(total_sulfur_dioxide_inputs))/np.std(total_sulfur_dioxide_inputs)
+    train_inputs[:,7] = (density_inputs - np.mean(density_inputs))/np.std(density_inputs)
+    train_inputs[:,8] = (pH_inputs - np.mean(pH_inputs))/np.std(pH_inputs)
+    train_inputs[:,9] = (sulphates_inputs - np.mean(sulphates_inputs))/np.std(sulphates_inputs)
+    train_inputs[:,10] = (alcohol_inputs - np.mean(alcohol_inputs))/np.std(alcohol_inputs)
+    
+    # Prepare the test inputs for normalisation
+    fixed_acidity_inputs = test_inputs[:,0]
+    volatile_acidity_inputs = test_inputs[:,1]
+    citric_acid_inputs = test_inputs[:,2]
+    residual_sugar_inputs = test_inputs[:,3]
+    chlorides_inputs = test_inputs[:,4]
+    free_sulfur_dioxide_inputs = test_inputs[:,5]
+    total_sulfur_dioxide_inputs = test_inputs[:,6]
+    density_inputs = test_inputs[:,7]
+    pH_inputs = test_inputs[:,8]
+    sulphates_inputs = test_inputs[:,9]
+    alcohol_inputs = test_inputs[:,10]
+    
+    # Normalise test inputs
+    test_inputs[:,0] = (fixed_acidity_inputs - np.mean(fixed_acidity_inputs))/np.std(fixed_acidity_inputs)
+    test_inputs[:,1] = (volatile_acidity_inputs - np.mean(volatile_acidity_inputs))/np.std(volatile_acidity_inputs)
+    test_inputs[:,2] = (citric_acid_inputs - np.mean(citric_acid_inputs))/np.std(citric_acid_inputs)
+    test_inputs[:,3] = (residual_sugar_inputs - np.mean(residual_sugar_inputs))/np.std(residual_sugar_inputs)
+    test_inputs[:,4] = (chlorides_inputs - np.mean(chlorides_inputs))/np.std(chlorides_inputs)
+    test_inputs[:,5] = (free_sulfur_dioxide_inputs - np.mean(free_sulfur_dioxide_inputs))/np.std(free_sulfur_dioxide_inputs)
+    test_inputs[:,6] = (total_sulfur_dioxide_inputs - np.mean(total_sulfur_dioxide_inputs))/np.std(total_sulfur_dioxide_inputs)
+    test_inputs[:,7] = (density_inputs - np.mean(density_inputs))/np.std(density_inputs)
+    test_inputs[:,8] = (pH_inputs - np.mean(pH_inputs))/np.std(pH_inputs)
+    test_inputs[:,9] = (sulphates_inputs - np.mean(sulphates_inputs))/np.std(sulphates_inputs)
+    test_inputs[:,10] = (alcohol_inputs - np.mean(alcohol_inputs))/np.std(alcohol_inputs)
+    
+    # Create a 2d array filled with the data for the highest correlating input parameters
+    inputCorr, targetCorr, indicesHighestCorr = correlation_parameters(train_inputs, data)        
+    test_inputs_corr = np.zeros(shape=((test_inputs[:,0]).size, indicesHighestCorr.size)) # datapoints x 4
+    b=0
+    indicesHighestCorr = indicesHighestCorr.astype(int)
+    for i in indicesHighestCorr:
+        test_inputs_corr[:, b] = test_inputs[:,indicesHighestCorr[b]]
+        b+=1
+    
+    notImportant, predictions = construct_knn_approx(inputCorr, targetCorr, 18, test_inputs_corr, test_targets, None)
+    SSE = sum_of_squared_errors(targetCorr, predictions, test_targets)
+    print("The error for the unseen 15% of test data with an optimized k of 18 is", SSE)
+    
+    print('prediction: ', np.shape(predictions))
+    print('targetCorr: ', np.shape(test_targets))
+    # Plot it
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    xs = np.linspace(1, (test_inputs_corr[:,0]).size, num=50)
+    ys = predictions[:,50]
+    predictive_line, = ax.plot(xs, ys, 'g-', linewidth=3)
+    ys = test_targets[:,50]
+    target_line, = ax.plot(xs, ys, 'r-', linewidth=3)
+    ax.set_xlabel("k")
+    ax.set_ylabel("MSE")
+    ax.legend([predictive_line, target_line],["predictions", "target"])
+    fig.suptitle('Predictions vs. target per data point') 
+    plt.show()
+    
+    
     
 def main(ifname):
-    data = import_data(ifname)
+    data, test = split_data('winequality-red.csv', ';', True, [0,1,2,3,4,5,6,7,8,9,10, 11])
     if type(data) == np.ndarray:
         print("Data array loaded: there are %d rows" % data.shape[0])
     
@@ -345,11 +473,12 @@ def main(ifname):
     
     # Perform knn only with parameters most correlated to quality to reduce parameter amount
     # Plot error over different amounts of parameters
-    inputCorr, targetCorr = correlation_parameters(inputs, data)
+    inputCorr, targetCorr, index = correlation_parameters(inputs, data)
     error_with_highest_corr_inputs_only(inputCorr, targetCorr)
     plot_all_inputs_vs_most_correlated_inputs (data, inputCorr, targetCorr)
     
-    
+    # Final test
+    final_test(data, test)
 
 if __name__ == '__main__':
     import sys
