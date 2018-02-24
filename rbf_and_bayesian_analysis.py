@@ -446,6 +446,7 @@ def parameter_search_with_centres_rbf(inputs, targets, folds):
     
     scales = np.logspace(0,5, 15) # of the basis functions
     reg_params = np.logspace(-12,-1, 15) # choices of regularisation strength
+    reg_params = np.insert(reg_params, 0, 0)
     # create empty 2d arrays to store the train and test errors
     train_errors_means = np.empty((centres_set.size, scales.size,reg_params.size))
     test_errors_means = np.empty((centres_set.size, scales.size,reg_params.size))
@@ -493,13 +494,16 @@ def parameter_search_with_centres_rbf(inputs, targets, folds):
     best_j = math.floor(np.argmin(test_errors_means[best_i, :, :])/(test_errors_means[best_i, :, :]).shape[1])
     best_k = np.argmin(test_errors_means[best_i, best_j,:])
     
+    no_reg_best_centres_i = math.floor(np.argmin(test_errors_means[:,:,0])/(test_errors_means[:,:,0].shape[1]))
+    no_reg_best_scales_j = np.argmin(test_errors_means[no_reg_best_centres_i,:,0])
     print("Best joint choice of parameters:")
     print(
         "\tscale %.2g ; lambda = %.2g ; centres proportion %.2g" % (scales[best_j],reg_params[best_k], centres_fraction[best_i]))
     print("best number of features = %r"%(len(centres_set[best_i])))
-    print("rbf min mean test error during cross validation = %r" % np.min(test_errors_means))
     
-    # train error bars
+    print("with no regularisation: best centres = %.2g"%(centres_fraction[no_reg_best_centres_i],))
+    print("with no regularisation: best scale = %.2g"%(scales[no_reg_best_scales_j],))
+   
     lower_train = train_errors_means - train_stdev_errors/np.sqrt(num_folds)
     upper_train = train_errors_means + train_stdev_errors/np.sqrt(num_folds)
     # test error bars
@@ -538,7 +542,7 @@ def parameter_search_with_centres_rbf(inputs, targets, folds):
     ax.fill_between(centres_fraction, lower_train[:,best_j,best_k], upper_train[:,best_j,best_k], alpha=0.2, color='b')
     ax.fill_between(centres_fraction, lower_test[:,best_j,best_k], upper_test[:,best_j,best_k], alpha=0.2, color='r')
     ax.set_ylim([0.5,0.85])
-    return centres_fraction[best_i], scales[best_j], reg_params[best_k], centres_set[best_i]
+    return centres_fraction[best_i], scales[best_j], reg_params[best_k], centres_set[best_i], scales[no_reg_best_scales_j],centres_set[no_reg_best_centres_i]
     
 def exploratory_plots(data, field_names=None):
     # the number of dimensions in the data
@@ -629,19 +633,15 @@ def gaussian(x, mu, sigma2):
      return (np.sqrt(2*math.pi*sigma2)**-1)*math.e**-((x - mu)**2/(2*sigma2))
     
 def joint_log_probability_error(targets, mean_approx, sigma2Ns):
-
     joint_log_error = 0
-    for i in range(0, targets.shape[0]):
-        joint_log_error += np.log(gaussian(targets[i], mean_approx[i], sigma2Ns[i]))
+    for n in range(0, targets.shape[0]):
+        joint_log_error += np.log(gaussian(targets[n], mean_approx[n], sigma2Ns[n]))
     joint_log_error = -joint_log_error
     return joint_log_error
     
 
 def main(ifname):
     data, field_names = import_data(ifname)
-    #if type(data) == np.ndarray:
-    #    print("Data array loaded: there are %d rows" % data.shape[0])
-    #    print ("first row:", data[0,:])
           
     test_fraction = 0.1
     # Import data and split into train and test parts
@@ -721,13 +721,14 @@ def main(ifname):
    
     # Find the paramaters for number of centres/features, scale and reg param
     # that best fits training data: 
-    best_feature_proportion, best_scale, best_regparam, centres = \
+    best_feature_proportion, best_scale, best_regparam, centres, best_scale_no_reg, best_centres_no_reg = \
         parameter_search_with_centres_rbf(training_inputs, training_targets, folds) 
     
     # Now evaluate error on test data using optimized parameter 
     # produced by training data:
-    feature_mapping = construct_rbf_feature_mapping(centres, best_scale)
     
+    # with regularisation
+    feature_mapping = construct_rbf_feature_mapping(centres, best_scale)
     designmtx = feature_mapping(training_inputs)
     weights = regularised_ml_weights(designmtx, training_targets,  best_regparam)
     
@@ -736,7 +737,19 @@ def main(ifname):
     
     # Evaluate the error between the predictions and true targets 
     test_error = root_mean_squared_error(test_targets, test_predicts)
-    print("Final: rbf test error = %r"%(test_error,))
+    print("Final: rbf test error with regularisation= %r"%(test_error,))
+    
+    #Now find error without regularisation:
+    feature_mapping = construct_rbf_feature_mapping(best_centres_no_reg, best_scale_no_reg)
+    designmtx = feature_mapping(training_inputs)
+    weights = ml_weights(designmtx, training_targets)
+    
+    test_designmtx = feature_mapping(test_inputs)
+    test_predicts = linear_model_predict(test_designmtx, weights)
+    
+    # Evaluate the error between the predictions and true targets 
+    test_error = root_mean_squared_error(test_targets, test_predicts)
+    print("Final: rbf test error without regularisation= %r"%(test_error,))
     
     #### BAYESIAN analysis ####
     
@@ -779,7 +792,7 @@ def main(ifname):
     ax.plot(alphas, bayesian_test_errors[:,best_j], 'r-')
     ax.set_xlabel("alpha")
     ax.set_ylabel("$Error(alpha)$")
-    ax.suptitle("Error while varying alpha using joint log probability ")
+    fig.suptitle("Error while varying alpha using joint log probability ")
     ax.set_xscale('log')
     
     fig = plt.figure()
@@ -787,18 +800,27 @@ def main(ifname):
     ax.plot(betas, bayesian_test_errors[best_i,:], 'r-')
     ax.set_xscale('log')
     ax.set_xlabel("Beta")
+    plt.axvline(x=1/np.var(training_targets))
     ax.set_ylabel("$Error(beta)$")
-    ax.suptitle("Error while varying beta using joint log probability")
+    fig.suptitle("Error while varying beta using joint log probability")
+    
+    # Now we have best alpha and beta, find the rms error of the model predictions
+    # for the test data:
+     
+    # Covariance prior
+    S0 = alphas[best_i] * np.identity(M)
+    # find the posterior over weights 
+    mN, SN = calculate_weights_posterior(designmtx, training_targets, betas[best_j], m0, S0)
+    # Now find the error
+    mean_approx = construct_feature_mapping_approx(feature_mapping, mN)
+    test_predic = mean_approx(test_inputs)  
+    b_test_error = root_mean_squared_error(test_targets, test_predic)
+    print("RMS error for bayesian model with best choices of alpha and beta = %r"%(b_test_error,))
     
     plt.show()
         
         
 if __name__ == '__main__':
     import sys
-    # this allows you to pass the file name as the first argument when you call
-    # your script from the command line
-    #try:
+
     main(sys.argv[1])
-    #except IndexError:
-     #   print(
-      #      "[ERROR] Please give the data-file location as the first argument.")
