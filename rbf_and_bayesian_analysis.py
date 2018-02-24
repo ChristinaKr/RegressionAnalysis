@@ -346,7 +346,7 @@ def train_and_test_split(N, test_fraction=None):
     test_fraction - a fraction (between 0 and 1) specifying the proportion of
         the data to use as test data.
     """
-    np.random.seed(42)
+    np.random.seed(7)
     if test_fraction is None:
         test_fraction = 0.5
     p = [test_fraction,(1-test_fraction)]
@@ -422,24 +422,30 @@ def plot_train_test_errors(
     ax.set_ylabel("$E_{RMS}$")
     ax.legend([train_line, test_line], ["train", "test"])
     return fig, ax
-  
+
 def parameter_search_with_centres_rbf(inputs, targets, folds):
     """
     """
     N = inputs.shape[0]    
     
     centres_set = []
-    centres_fraction = np.linspace(0.05, 0.5, 10)
+    centres_fraction = np.linspace(0.05, 0.4, 10)
     
+    centres_variance = []
     for i, sample_fraction in enumerate(centres_fraction):
         p = (1-sample_fraction,sample_fraction)
+        np.random.seed(42)
         centres = inputs[np.random.choice([False,True], size=N, p=p),:]
         centres_set.append(centres)
+        centres=np.array(centres)
+        centres_variance.append(np.var(centres))
     
+    centres_variance = np.array(centres_variance)
+    print("centres_variance = %r"%(centres_variance,))
     centres_set = np.array(centres_set)
     
     scales = np.logspace(0,5, 15) # of the basis functions
-    reg_params = np.logspace(-11,-3, 15) # choices of regularisation strength
+    reg_params = np.logspace(-12,-1, 15) # choices of regularisation strength
     # create empty 2d arrays to store the train and test errors
     train_errors_means = np.empty((centres_set.size, scales.size,reg_params.size))
     test_errors_means = np.empty((centres_set.size, scales.size,reg_params.size))
@@ -490,7 +496,9 @@ def parameter_search_with_centres_rbf(inputs, targets, folds):
     print("Best joint choice of parameters:")
     print(
         "\tscale %.2g ; lambda = %.2g ; centres proportion %.2g" % (scales[best_j],reg_params[best_k], centres_fraction[best_i]))
+    print("best number of features = %r"%(len(centres_set[best_i])))
     print("rbf min mean test error during cross validation = %r" % np.min(test_errors_means))
+    
     # train error bars
     lower_train = train_errors_means - train_stdev_errors/np.sqrt(num_folds)
     upper_train = train_errors_means + train_stdev_errors/np.sqrt(num_folds)
@@ -508,8 +516,8 @@ def parameter_search_with_centres_rbf(inputs, targets, folds):
     ax.fill_between(scales, lower_train[best_i,:,best_k], upper_train[best_i,:,best_k], alpha=0.2, color='b')
     ax.fill_between(scales, lower_test[best_i,:,best_k], upper_test[best_i,:,best_k], alpha=0.2, color='r') 
     
-    ax.set_ylim([0,1])
-    fig.suptitle('Error for different scales using the best regulariation and centres choice')
+    ax.set_ylim([0.5,0.85])
+    fig.suptitle('Errors for different scale choices')
     plt.axvline(x=scales[best_j])
    
     # ...and the error for different regularisation choices given the best
@@ -519,18 +527,17 @@ def parameter_search_with_centres_rbf(inputs, targets, folds):
     ax.fill_between(reg_params, lower_train[best_i,best_j,:], upper_train[best_i,best_j,:], alpha=0.2, color='b')
     ax.fill_between(reg_params, lower_test[best_i,best_j,:], upper_test[best_i,best_j,:], alpha=0.2, color='r')
     ax.set_xscale('log')
-    ax.set_ylim([0.3,1])
-    fig.suptitle('Error for different regularisation choices given the best scale and centres choice')
+    ax.set_ylim([0.5,0.85])
+    fig.suptitle('Error for different regularisation choices')
     plt.axvline(x=reg_params[best_k])
     
     #Plot error for varying number of features given best regularisation and scales choice
     fig , ax = plot_train_test_errors(
         "p", centres_fraction, train_errors_means[:,best_j,best_k], test_errors_means[:,best_j,best_k])
-    fig.suptitle('Error for varying number of features given the best scale and lambda choice')
-    plt.axvline(x=centres_fraction[best_i])
+    fig.suptitle('Errors over varying number of features')
     ax.fill_between(centres_fraction, lower_train[:,best_j,best_k], upper_train[:,best_j,best_k], alpha=0.2, color='b')
     ax.fill_between(centres_fraction, lower_test[:,best_j,best_k], upper_test[:,best_j,best_k], alpha=0.2, color='r')
-    
+    ax.set_ylim([0.5,0.85])
     return centres_fraction[best_i], scales[best_j], reg_params[best_k], centres_set[best_i]
     
 def exploratory_plots(data, field_names=None):
@@ -617,8 +624,19 @@ def create_folds(N, num_folds):
         test = (parts == f)
         folds.append((train,test))
     return folds
-  
-  
+    
+def gaussian(x, mu, sigma2):
+     return (np.sqrt(2*math.pi*sigma2)**-1)*math.e**-((x - mu)**2/(2*sigma2))
+    
+def joint_log_probability_error(targets, mean_approx, sigma2Ns):
+
+    joint_log_error = 0
+    for i in range(0, targets.shape[0]):
+        joint_log_error += np.log(gaussian(targets[i], mean_approx[i], sigma2Ns[i]))
+    joint_log_error = -joint_log_error
+    return joint_log_error
+    
+
 def main(ifname):
     data, field_names = import_data(ifname)
     #if type(data) == np.ndarray:
@@ -645,42 +663,54 @@ def main(ifname):
 
     inputs = data[:, [0,1,2,3,4,5,6,7,8,9,10]]
     
-    fixed_acidity_inputs = inputs[:,0]
-    volatile_acidity_inputs = inputs[:,1]
-    citric_acid_inputs = inputs[:,2]
-    residual_sugar_inputs = inputs[:,3]
-    chlorides_inputs = inputs[:,4]
-    free_sulfur_dioxide_inputs = inputs[:,5]
-    total_sulfur_dioxide_inputs = inputs[:,6]
-    density_inputs = inputs[:,7]
-    pH_inputs = inputs[:,8]
-    sulphates_inputs = inputs[:,9]
-    alcohol_inputs = inputs[:,10]
+    training_fixed_acidity_inputs = training_inputs[:,0]
+    training_volatile_acidity_inputs = training_inputs[:,1]
+    training_citric_acid_inputs = training_inputs[:,2]
+    training_residual_sugar_inputs = training_inputs[:,3]
+    training_chlorides_inputs = training_inputs[:,4]
+    training_free_sulfur_dioxide_inputs = training_inputs[:,5]
+    training_total_sulfur_dioxide_inputs = training_inputs[:,6]
+    training_density_inputs = training_inputs[:,7]
+    training_pH_inputs = training_inputs[:,8]
+    training_sulphates_inputs = training_inputs[:,9]
+    training_alcohol_inputs = training_inputs[:,10]
     
-    print("np.mean(fixed_acidity_inputs) = %r" % (np.mean(fixed_acidity_inputs),))
-    print("np.std(volatile_acidity_inputs) = %r" % (np.std(volatile_acidity_inputs),))
-    print("np.mean(citric_acid_inputs) = %r" % (np.mean(citric_acid_inputs),))
-    print("np.std(residual_sugar_inputs) = %r" % (np.std(residual_sugar_inputs),))
-    print("np.mean(chlorides_inputs) = %r" % (np.mean(chlorides_inputs),))
-    print("np.std(free_sulfur_dioxide_inputs) = %r" % (np.std(free_sulfur_dioxide_inputs),))
-    print("np.std(total_sulfur_dioxide_inputs) = %r" % (np.std(total_sulfur_dioxide_inputs),))
-    print("np.std(density_inputs) = %r" % (np.std(density_inputs),))
-    print("np.std(pH_inputs) = %r" % (np.std(pH_inputs),))
-    print("np.std(sulphates_inputs) = %r" % (np.std(sulphates_inputs),))
-    print("np.std(alcohol_inputs) = %r" % (np.std(alcohol_inputs),))
+    test_fixed_acidity_inputs = test_inputs[:,0]
+    test_volatile_acidity_inputs = test_inputs[:,1]
+    test_citric_acid_inputs = test_inputs[:,2]
+    test_residual_sugar_inputs = test_inputs[:,3]
+    test_chlorides_inputs = test_inputs[:,4]
+    test_free_sulfur_dioxide_inputs = test_inputs[:,5]
+    test_total_sulfur_dioxide_inputs = test_inputs[:,6]
+    test_density_inputs = test_inputs[:,7]
+    test_pH_inputs = test_inputs[:,8]
+    test_sulphates_inputs = test_inputs[:,9]
+    test_alcohol_inputs = test_inputs[:,10]    
     
     # normalise inputs (meaning radial basis functions are more helpful)
-    inputs[:,0] = (fixed_acidity_inputs - np.mean(fixed_acidity_inputs))/np.std(fixed_acidity_inputs)
-    inputs[:,1] = (volatile_acidity_inputs - np.mean(volatile_acidity_inputs))/np.std(volatile_acidity_inputs)
-    inputs[:,2] = (citric_acid_inputs - np.mean(citric_acid_inputs))/np.std(citric_acid_inputs)
-    inputs[:,3] = (residual_sugar_inputs - np.mean(residual_sugar_inputs))/np.std(residual_sugar_inputs)
-    inputs[:,4] = (chlorides_inputs - np.mean(chlorides_inputs))/np.std(chlorides_inputs)
-    inputs[:,5] = (free_sulfur_dioxide_inputs - np.mean(free_sulfur_dioxide_inputs))/np.std(free_sulfur_dioxide_inputs)
-    inputs[:,6] = (total_sulfur_dioxide_inputs - np.mean(total_sulfur_dioxide_inputs))/np.std(total_sulfur_dioxide_inputs)
-    inputs[:,7] = (density_inputs - np.mean(density_inputs))/np.std(density_inputs)
-    inputs[:,8] = (pH_inputs - np.mean(pH_inputs))/np.std(pH_inputs)
-    inputs[:,9] = (sulphates_inputs - np.mean(sulphates_inputs))/np.std(sulphates_inputs)
-    inputs[:,10] = (alcohol_inputs - np.mean(alcohol_inputs))/np.std(alcohol_inputs)
+    training_inputs[:,0] = (training_fixed_acidity_inputs - np.mean(training_fixed_acidity_inputs))/np.std(training_fixed_acidity_inputs)
+    training_inputs[:,1] = (training_volatile_acidity_inputs - np.mean(training_volatile_acidity_inputs))/np.std(training_volatile_acidity_inputs)
+    training_inputs[:,2] = (training_citric_acid_inputs - np.mean(training_citric_acid_inputs))/np.std(training_citric_acid_inputs)
+    training_inputs[:,3] = (training_residual_sugar_inputs - np.mean(training_residual_sugar_inputs))/np.std(training_residual_sugar_inputs)
+    training_inputs[:,4] = (training_chlorides_inputs - np.mean(training_chlorides_inputs))/np.std(training_chlorides_inputs)
+    training_inputs[:,5] = (training_free_sulfur_dioxide_inputs - np.mean(training_free_sulfur_dioxide_inputs))/np.std(training_free_sulfur_dioxide_inputs)
+    training_inputs[:,6] = (training_total_sulfur_dioxide_inputs - np.mean(training_total_sulfur_dioxide_inputs))/np.std(training_total_sulfur_dioxide_inputs)
+    training_inputs[:,7] = (training_density_inputs - np.mean(training_density_inputs))/np.std(training_density_inputs)
+    training_inputs[:,8] = (training_pH_inputs - np.mean(training_pH_inputs))/np.std(training_pH_inputs)
+    training_inputs[:,9] = (training_sulphates_inputs - np.mean(training_sulphates_inputs))/np.std(training_sulphates_inputs)
+    training_inputs[:,10] = (training_alcohol_inputs - np.mean(training_alcohol_inputs))/np.std(training_alcohol_inputs)
+   
+    test_inputs[:,0] = (test_fixed_acidity_inputs - np.mean(test_fixed_acidity_inputs))/np.std(test_fixed_acidity_inputs)
+    test_inputs[:,1] = (test_volatile_acidity_inputs - np.mean(test_volatile_acidity_inputs))/np.std(test_volatile_acidity_inputs)
+    test_inputs[:,2] = (test_citric_acid_inputs - np.mean(test_citric_acid_inputs))/np.std(test_citric_acid_inputs)
+    test_inputs[:,3] = (test_residual_sugar_inputs - np.mean(test_residual_sugar_inputs))/np.std(test_residual_sugar_inputs)
+    test_inputs[:,4] = (test_chlorides_inputs - np.mean(test_chlorides_inputs))/np.std(test_chlorides_inputs)
+    test_inputs[:,5] = (test_free_sulfur_dioxide_inputs - np.mean(test_free_sulfur_dioxide_inputs))/np.std(test_free_sulfur_dioxide_inputs)
+    test_inputs[:,6] = (test_total_sulfur_dioxide_inputs - np.mean(test_total_sulfur_dioxide_inputs))/np.std(test_total_sulfur_dioxide_inputs)
+    test_inputs[:,7] = (test_density_inputs - np.mean(test_density_inputs))/np.std(test_density_inputs)
+    test_inputs[:,8] = (test_pH_inputs - np.mean(test_pH_inputs))/np.std(test_pH_inputs)
+    test_inputs[:,9] = (test_sulphates_inputs - np.mean(test_sulphates_inputs))/np.std(test_sulphates_inputs)
+    test_inputs[:,10] = (test_alcohol_inputs - np.mean(test_alcohol_inputs))/np.std(test_alcohol_inputs)
    
     #### RBF model #####
     
@@ -697,15 +727,16 @@ def main(ifname):
     # Now evaluate error on test data using optimized parameter 
     # produced by training data:
     feature_mapping = construct_rbf_feature_mapping(centres, best_scale)
-    designmtx = feature_mapping(training_inputs)
     
+    designmtx = feature_mapping(training_inputs)
     weights = regularised_ml_weights(designmtx, training_targets,  best_regparam)
     
     test_designmtx = feature_mapping(test_inputs)
     test_predicts = linear_model_predict(test_designmtx, weights)
-    # Evaluate the error between the predictions and true targets on both sets
+    
+    # Evaluate the error between the predictions and true targets 
     test_error = root_mean_squared_error(test_targets, test_predicts)
-    print("final: rbf test error = %r"%(test_error,))
+    print("Final: rbf test error = %r"%(test_error,))
     
     #### BAYESIAN analysis ####
     
@@ -713,47 +744,52 @@ def main(ifname):
     M = designmtx.shape[1]
     # Define a prior mean
     m0 = np.zeros(M)
-    
-    # define the noise precision of our data
-    beta = 1/np.var(targets)
-    print("beta = %r" % (beta,))   
 
     # Try different values of alpha for the prior covariance matrix
-    alphas = np.logspace(-1,6, 10)
-    
-    bayesian_train_errors=[]
-    bayesian_test_errors=[]
+    alphas = np.logspace(-1,8, 10)  
+
+    #Try different iterations on the noise precision
+    betas = np.logspace(-1,2,10)
+
+    bayesian_test_errors=np.empty((alphas.size, betas.size))
     for i, alpha in enumerate(alphas):
-        # Covariance prior:
-        S0 = alpha * np.identity(M)
-    
-        # find the posterior over weights 
-        mN, SN = calculate_weights_posterior(designmtx, training_targets, beta, m0, S0)
-        # the posterior mean (also the MAP) gives the central prediction
-        mean_approx = construct_feature_mapping_approx(feature_mapping, mN)#prediciton function
-    
-        # Now to see how it performs on test data
-        ys, sigma2Ns = predictive_distribution(test_designmtx, beta, mN, SN)    
-        lower = ys-np.sqrt(sigma2Ns)
-        upper = ys+np.sqrt(sigma2Ns)
+        for j, beta in enumerate(betas):
+       
+            # Covariance prior
+            S0 = alpha * np.identity(M)
+            # find the posterior over weights 
+            mN, SN = calculate_weights_posterior(designmtx, training_targets, beta, m0, S0)
+            # Now find the error
+            ys, sigma2Ns = predictive_distribution(test_designmtx, beta, mN, SN)    
+            log_error = joint_log_probability_error(test_targets, ys, sigma2Ns)
         
-        train_predic = mean_approx(training_inputs)   
-        train_error = root_mean_squared_error(training_targets, train_predic)
-        test_error = root_mean_squared_error(test_targets, ys)
-        bayesian_train_errors.append(train_error)
-        bayesian_test_errors.append(test_error)
+            bayesian_test_errors[i,j] = log_error
     
-    bayesian_test_errors = np.array(bayesian_test_errors)
-    bayesian_train_errors = np.array(bayesian_train_errors)
+    # Index of variation with smallest test error 
+    best_i = math.floor(np.argmin(bayesian_test_errors)/bayesian_test_errors.shape[1])
+    best_j = np.argmin(bayesian_test_errors[best_i,:])
     
-    print("best alpha = %r"% (np.argmin(bayesian_test_errors)))
-    print("bayesian test_error with optimal alpha = %r"%(np.min(bayesian_test_errors),))
-    fig , ax = plot_train_test_errors(
-        "alpha", alphas, bayesian_train_errors, bayesian_test_errors)
+    print("best alpha = %r" % (alphas[best_i],))
+    print("best beta = %r"%(betas[best_j],))
+    print("bayesian test log error with optimal alpha and beta = %r"%(np.min(bayesian_test_errors),))
+   
+    #Plot the error for different values of alpha and beta
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot(alphas, bayesian_test_errors[:,best_j], 'r-')
+    ax.set_xlabel("alpha")
+    ax.set_ylabel("$Error(alpha)$")
+    ax.suptitle("Error while varying alpha using joint log probability ")
     ax.set_xscale('log')
-    ax.set_ylim([0,2])
-    fig.suptitle('Error for different choices of alpha')
-    fig.savefig("bayesian_regression_rbf_varying_alpha.pdf", fmt="pdf")
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot(betas, bayesian_test_errors[best_i,:], 'r-')
+    ax.set_xscale('log')
+    ax.set_xlabel("Beta")
+    ax.set_ylabel("$Error(beta)$")
+    ax.suptitle("Error while varying beta using joint log probability")
+    
     plt.show()
         
         
