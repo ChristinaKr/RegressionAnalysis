@@ -23,8 +23,8 @@ def main(
     """
     # if no file name is provided then use synthetic data
     training_data_as_array, test_data_as_array, field_names = split_data(
-            ifname, delimiter=delimiter, has_header=has_header, columns=columns, seed=42)
-    exploratory_plots(training_data_as_array, field_names)
+            ifname, delimiter=delimiter, has_header=has_header, columns=columns, seed=None)
+    #exploratory_plots(training_data_as_array, field_names)
     N = training_data_as_array.shape[0]
     inputs = training_data_as_array[:,[0,1,2,3,4,5,6,7,8,9,10]]
     targets = training_data_as_array[:,11]
@@ -118,34 +118,31 @@ def main(
     
     # gradient descent 
 
-    # set X (training data) and y (target variable)
-    X2 = norm_inputs
-    y2 = targets
+    # set inputs and targets 
+    grad_inputs = norm_inputs
+    grad_targets = targets
     
-    # convert to matrices and initialize theta
-    X2 = np.matrix(X2)
-    y2 = (np.matrix(targets)).T
-    #m = np.shape(X2)
+    # convert to matrices, initialise theta
+    grad_inputs = np.matrix(grad_inputs)
+    grad_targets = (np.matrix(targets)).T
     theta = np.zeros((1,12))
     theta = np.matrix(theta)
-    #theta = theta.T
-    #print theta
     alpha = 0.01
     iters = 1000
 
     # perform linear regression on the data set
-    theta, cost2 = gradientDescent(X2, y2, theta, alpha, iters)
+    theta, cost2 = gradientDescent(grad_inputs, grad_targets, theta, alpha, iters)
     
-    # plot
+    # plot error vs iterations to see the minimisation
     fig, ax = plt.subplots()
     ax.plot(np.arange(iters), cost2, 'r')
     ax.set_xlabel('Iterations')
     ax.set_ylabel('Error')
     ax.set_title('Error vs Iterations')
     
-    # predict    
-    quality = (X2 * theta.T)
-    errors = np.sum((np.array(quality) - np.array(y2))**2)/len(y2)
+    # predict overall error using gradient descent  
+    quality = (grad_inputs * theta.T)
+    errors = np.sum((np.array(quality) - np.array(grad_targets))**2)/len(grad_targets)
     test_error_gd = np.sqrt(errors)
     
     print "Error with gradient descent:", test_error_gd
@@ -153,6 +150,10 @@ def main(
     plt.show()
 
 def exploratory_plots(data, field_names=None):
+    '''
+    This method takes the input data and generates histograms for all of the variables
+    '''
+    
     # the number of dimensions in the data
     dim = data.shape[1]
     # create an empty figure object
@@ -175,29 +176,31 @@ def exploratory_plots(data, field_names=None):
 def evaluate_linear_approx(inputs, targets, test_fraction):
     '''
     This evaluates the linear performance of the data. 
-    This takes in an input variable of runs - this is the number of times the errors are calculated for each reg param,
-        this is then averaged and the mean is plot, therefore producing a smooth and accurate curve.
+    The test and train errors are then plot against different regularisation parameters.
     '''
     # the linear performance
-    reg_params = np.logspace(-15,-4, 11)
+    reg_params = np.logspace(-25,10, 11)
     train_errors = []
     test_errors = []
+    mean_test_error = []
+    mean_train_error = []
     
     # plot the average for a number of runs
     for reg_param in reg_params:
-        #print("Evaluating reg_para " + str(reg_param))
-        train_error, test_error = simple_evaluation_linear_model(
-            inputs, targets, test_fraction=test_fraction, reg_param=reg_param)
-        train_errors.append(train_error)
-        test_errors.append(test_error)
-        # once errors calculated for no. of runs, calculate average, append and clear array for next reg param
+        for i in range(1000):
+            #print("Evaluating reg_para " + str(reg_param))
+            train_error, test_error = simple_evaluation_linear_model(
+                inputs, targets, test_fraction=test_fraction, reg_param=reg_param)
+            train_errors.append(train_error)
+            test_errors.append(test_error)
+            # once errors calculated for no. of runs, calculate average, append and clear array for next reg param
+        mean_train_error.append(np.mean(train_errors))
+        mean_test_error.append(np.mean(test_errors))
+        train_errors = []
+        test_errors = []
     
     fig , ax = plot_train_test_errors(
-        "$\lambda$", reg_params, train_errors, test_errors)
-    # we also want to plot a straight line showing the linear performance
-    xlim = ax.get_xlim()
-    #test, = ax.plot(xlim, test_error*np.ones(2), ':g', label='test')
-    #ax.legend([train_line, test_line, test], ["train", "test", "test error"], loc=1)
+        "$\lambda$", reg_params, mean_train_error, mean_test_error)
     ax.set_xscale('log')
     
     print("Linear Regression:")
@@ -567,29 +570,37 @@ def expand_to_monomials(inputs, degree):
         expanded_inputs.append(inputs**i)
     return np.array(expanded_inputs).transpose()
 
-def gradientDescent(X, y, theta2, alpha, iters):
+def gradientDescent(X, y, theta, alpha, iters):
+    """
+    This method uses the gradient descent algorithm to minmise the error function
     
-    #theta2 = theta2.T  
-    #print "theta2: ", theta2
+    This code has been adapted from a tutorial online: 
+        johnwittenauer.net. (2015). 
+        Machine Learning Exercises In Python, Part 2. [Online]. 
+        Available at: http://www.johnwittenauer.net/machine-learning-exercises-in-python-part-2/ (accessed 24th February 2018).
+
+    """
     
-    temp = np.matrix(np.zeros(theta2.shape))
-    parameters = int(theta2.ravel().shape[1])
+    temp = np.matrix(np.zeros(theta.shape))
+    parameters = int(theta.ravel().shape[1])
     cost = np.zeros(iters)
 
     for i in range(iters):
-        error = (X * theta2.T) - y
+        error = (X * theta.T) - y
 
         for j in range(parameters):
             term = np.multiply(error, X[:,j])
-            temp[0,j] = theta2[0,j] - ((alpha / len(X)) * np.sum(term))
+            temp[0,j] = theta[0,j] - ((alpha / len(X)) * np.sum(term))
 
-        theta2 = temp
-        cost[i] = computeCost(X, y, theta2)
+        theta = temp
+        cost[i] = computeCost(X, y, theta)
 
-    return theta2, cost
+    return theta, cost
 
 def computeCost(X, y, theta2): 
-    #theta2 = theta2.T   
+    """
+    This method computes the cost function for gradient descent
+    """ 
     inner = np.power(((X * theta2.T) - y), 2)
     return np.sum(inner) / (2 * len(X))
     
@@ -613,38 +624,6 @@ def split_data(ifname, delimiter=None, has_header=False, columns=None, seed=42, 
     field_names -- if file has header, then this is a list of strings of the
       the field names imported. Otherwise, it is a None object.
     """
-    '''if not seed is None:
-        np.random.seed(seed)
-    if delimiter is None:
-        delimiter = '\t'
-    with open(ifname, 'r') as ifile:
-        datareader = csv.reader(ifile, delimiter=delimiter)
-        # if the data has a header line we want to avoid trying to import it.
-        # instead we'll print it to screen
-        if has_header:
-            field_names = next(datareader)
-            #print("Importing data with field_names:\n\t" + ",".join(field_names))
-        else:
-            # if there is no header then the field names is a dummy variable
-            field_names = None
-        # create an empty list to store each row of data
-        data = []
-        for row in datareader:
-            # print("row = %r" % (row,))
-            # for each row of data only take the columns we are interested in
-            if not columns is None:
-                row = [row[c] for c in columns]
-            # now store in our data list
-            data.append(row)
-        #print("There are %d entries" % len(data))
-        #print("Each row has %d elements" % len(data[0]))
-    # convert the data (list object) into a numpy array.
-    data_as_array = np.array(data).astype(float)
-    if not columns is None and not field_names is None:
-        # thin the associated field names if needed
-        field_names = [field_names[c] for c in columns]
-    # return this array to caller (and field_names if provided)
-    return data_as_array, field_names'''
     
     np.random.seed(seed)
     test_rows = np.unique(np.array(np.random.uniform(size = int(fraction*1599))*1599).astype(int))
