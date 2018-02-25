@@ -334,6 +334,7 @@ def plot_all_inputs_vs_most_correlated_inputs(data, inputCorr, targetCorr):
     ax.fill_between(xs, lower_CorrInput, upper_CorrInput, alpha=0.2, color='g')
     ax.fill_between(xs, lower_allInput, upper_allInput, alpha=0.2, color='r')
     plt.show()
+#    fig.savefig("kNN_input_parameter_comparison.pdf", fmt="pdf")
     
     # Find and print the outcomes (smallest error and optimal k)
     indexCorrSSE = np.argmin(corrInputs)
@@ -394,6 +395,7 @@ def calculate_and_plot_rounded_vs_unrounded_mse(data):
     ax.fill_between(xs, lower_rounded, upper_rounded, alpha=0.2, color='g')
     ax.fill_between(xs, lower_unrounded, upper_unrounded, alpha=0.2, color='r')
     plt.show()
+#    fig.savefig("kNN_rounding_comparison.pdf", fmt="pdf")
     
     # Find and print the outcomes (smallest error and optimal k)
     indexRoundedMeanSSE = np.argmin(SSEsRoundedMean)
