@@ -515,11 +515,8 @@ def parameter_search_with_centres_rbf(inputs, targets, folds):
     fig , ax = plot_train_test_errors(
         "scale", scales, train_errors_means[best_i,:,best_k], test_errors_means[best_i,:,best_k])
     ax.set_xscale('log')
-    
-   
     ax.fill_between(scales, lower_train[best_i,:,best_k], upper_train[best_i,:,best_k], alpha=0.2, color='b')
-    ax.fill_between(scales, lower_test[best_i,:,best_k], upper_test[best_i,:,best_k], alpha=0.2, color='r') 
-    
+    ax.fill_between(scales, lower_test[best_i,:,best_k], upper_test[best_i,:,best_k], alpha=0.2, color='r')  
     ax.set_ylim([0.5,0.85])
     fig.suptitle('Errors for different scale choices')
     plt.axvline(x=scales[best_j])
@@ -784,6 +781,7 @@ def main(ifname):
     
     print("best alpha = %r" % (alphas[best_i],))
     print("best beta = %r"%(betas[best_j],))
+    print("1/np.var(training_targets) = %r"%(np.var(training_targets),))
     print("bayesian test log error with optimal alpha and beta = %r"%(np.min(bayesian_test_errors),))
    
     #Plot the error for different values of alpha and beta
