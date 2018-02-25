@@ -477,7 +477,8 @@ def final_test(data, test):
     
     notImportant, predictions = construct_knn_approx(inputCorr, targetCorr, 18, test_inputs_corr, test_targets, None)
     SSE = sum_of_squared_errors(targetCorr, predictions, test_targets)
-    print("The error for the unseen 15% of test data with an optimized k of 18 is", SSE)
+    SE = np.std(SSE)
+    print("The error for the unseen 15% of test data with an optimized k of 18 is", SSE, "and a standard error of", SE)
     
     
     
