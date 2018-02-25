@@ -1,21 +1,12 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Feb 20 10:17:38 2018
-
-@author: christinakronser
-"""
-
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats.stats import pearsonr   
 
-def split_data(ifname, delimiter=None, has_header=False, columns=None, seed=42, fraction=0.15):
+'''def split_data(ifname, delimiter=None, has_header=False, columns=None, seed=42, fraction=0.15):
     """
     Imports a tab/comma/semi-colon/... separated data file as an array of
     floating point numbers.
-
     parameters
     ----------
     ifname -- filename/path of data file.
@@ -24,14 +15,13 @@ def split_data(ifname, delimiter=None, has_header=False, columns=None, seed=42, 
     columns -- a list of integers specifying which columns of the file to import
         (counting from 0)
     seed -- the seed for the pseudo-random number generator
-
     returns
     -------
     training_data_as_array -- the training data as a numpy.array object
     test_data_as_array --  the test data as a numpy.array object
     """
 
-    np.random.seed(seed)
+    np.random.seed(seed) 
     test_rows = np.unique(np.array(np.random.uniform(size = int(fraction*1599))*1599).astype(int))
 #    print(test_rows)
 
@@ -63,13 +53,12 @@ def split_data(ifname, delimiter=None, has_header=False, columns=None, seed=42, 
     training_data_as_array = np.array(training_data).astype(float)
     test_data_as_array = np.array(test_data).astype(float)
     # return the two data sets to caller
-    return training_data_as_array, test_data_as_array
+    return training_data_as_array, test_data_as_array'''
 
   
 def train_and_test_split(N, test_fraction=None, seed=None):
     """
     Randomly generates a train/test split for data of size N.
-
     parameters
     ----------
     N - the dataset size
@@ -90,7 +79,6 @@ def train_and_test_partition(inputs, targets, train_part, test_part, seed):
     """
     Splits a data matrix (or design matrix) and associated targets into train
     and test parts.
-
     parameters
     ----------
     inputs - a 2d numpy array whose rows are the datapoints, or can be a design
@@ -100,7 +88,6 @@ def train_and_test_partition(inputs, targets, train_part, test_part, seed):
         data points. If the ith element is true then the ith data point will be
         added to the training data.
     test_part - (like train_part) but specifying the test points.
-
     returns
     -------     
     train_inputs - the training input matrix
@@ -483,8 +470,8 @@ def final_test(data, test):
     
     
     
-def main(ifname):
-    data, test = split_data('winequality-red.csv', ';', True, [0,1,2,3,4,5,6,7,8,9,10, 11])
+def knn_regression(data,test):
+    #data, test = split_data('winequality-red.csv', ';', True, [0,1,2,3,4,5,6,7,8,9,10, 11])
     if type(data) == np.ndarray:
         print("Data array loaded: there are %d rows" % data.shape[0])
     

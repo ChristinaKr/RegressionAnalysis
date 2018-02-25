@@ -4,14 +4,13 @@ import numpy.linalg as linalg
 import matplotlib.pyplot as plt
 import scipy as sp
 
-def main(
-        ifname, delimiter=None, columns=None, has_header=True,
-        test_fraction=0.25):
+def linear_models(
+        training_data_as_array,test_data_as_array, test_fraction):
     """
     To be called when the script is run. This function creates, fits and plots
     synthetic data, and then fits and plots imported data (if a filename is
     provided). In both cases, data is 2 dimensional real valued data and is fit
-    with maximum likelihood 2d gaussian.
+    with maximum likelihood 2d gaussian. 
 
     parameters
     ----------
@@ -22,9 +21,8 @@ def main(
         (counting from 0)    
     """
     # if no file name is provided then use synthetic data
-    training_data_as_array, test_data_as_array, field_names = split_data(
-            ifname, delimiter=delimiter, has_header=has_header, columns=columns, seed=None)
-    #exploratory_plots(training_data_as_array, field_names)
+    #training_data_as_array, test_data_as_array, field_names = split_data(
+            #ifname, delimiter=delimiter, has_header=has_header, columns=columns, seed=42)
     N = training_data_as_array.shape[0]
     inputs = training_data_as_array[:,[0,1,2,3,4,5,6,7,8,9,10]]
     targets = training_data_as_array[:,11]
@@ -76,10 +74,10 @@ def main(
     
     # Random split of data into train and test
     # non normalised inputs
-    train_errors, test_errors, fig,ax = evaluate_linear_approx(
+    train_errors, test_errors, train_sd, test_sd, fig,ax = evaluate_linear_approx(
         inputs, targets, test_fraction)
     
-    fig.suptitle('Train and Test Errors of raw data over different values of \n lambda (the regularisation parameter) ')
+    fig.suptitle('Train and Test Errors of raw data over different values of \n lambda (the regularisation parameter), averaged over 1000 runs ')
     
     # use cross validation
     num_folds = 5
@@ -95,10 +93,10 @@ def main(
     
     # Random split of data into train and test
     # normalised 
-    train_errors2, test_errors2, fig2,ax2 = evaluate_linear_approx(
+    train_errors2, test_errors2, train_sd2, test_sd2,  fig2,ax2 = evaluate_linear_approx(
         norm_inputs, targets, test_fraction)
     
-    fig2.suptitle('Train and Test Errors of normalised data over different values of \n lambda (the regularisation parameter) ')
+    fig2.suptitle('Train and Test Errors of normalised data over different values of \n lambda (the regularisation parameter), averaged over 1000 runs')
     
     # using cross evaluation
     # normalised
@@ -149,41 +147,19 @@ def main(
     
     plt.show()
 
-def exploratory_plots(data, field_names=None):
-    '''
-    This method takes the input data and generates histograms for all of the variables
-    '''
-    
-    # the number of dimensions in the data
-    dim = data.shape[1]
-    # create an empty figure object
-    fig = plt.figure(figsize=(14,10))
-    # create a grid of four axes
-    z = 1
-    for i in range(dim):
-        for j in range(dim):
-            ax = fig.add_subplot(4,3,z)            
-            # if it is a plot on the diagonal we histogram the data
-            if i == j: 
-                ax.hist(data[:,i])
-                z = z+1
-                ax.set_xlabel(field_names[j])
-                ax.set_ylabel("Observations")
-                ax.set_yticks(ax.get_yticks()[::2])
-                ax.set_xticks(ax.get_xticks()[::2])          
-    plt.tight_layout()
-
 def evaluate_linear_approx(inputs, targets, test_fraction):
     '''
     This evaluates the linear performance of the data. 
     The test and train errors are then plot against different regularisation parameters.
     '''
     # the linear performance
-    reg_params = np.logspace(-25,10, 11)
+    reg_params = np.logspace(-12,8, 20)
     train_errors = []
     test_errors = []
     mean_test_error = []
     mean_train_error = []
+    std_test_error = []
+    std_train_error = []
     
     # plot the average for a number of runs
     for reg_param in reg_params:
@@ -196,6 +172,8 @@ def evaluate_linear_approx(inputs, targets, test_fraction):
             # once errors calculated for no. of runs, calculate average, append and clear array for next reg param
         mean_train_error.append(np.mean(train_errors))
         mean_test_error.append(np.mean(test_errors))
+        std_train_error.append(np.std(train_errors))
+        std_test_error.append(np.std(test_errors))
         train_errors = []
         test_errors = []
     
@@ -203,9 +181,19 @@ def evaluate_linear_approx(inputs, targets, test_fraction):
         "$\lambda$", reg_params, mean_train_error, mean_test_error)
     ax.set_xscale('log')
     
+    # train error bars
+    lower = mean_train_error - std_train_error/np.sqrt(1000)
+    upper = mean_train_error + std_train_error/np.sqrt(1000)
+    ax.fill_between(reg_params, lower, upper, alpha=0.2, color='b')
+    # test error bars
+    lower = mean_test_error - std_test_error/np.sqrt(1000)
+    upper = mean_test_error + std_test_error/np.sqrt(1000)
+    ax.fill_between(reg_params, lower, upper, alpha=0.2, color='r')
+    
     print("Linear Regression:")
-    print("\t(train_error, test_error) = %r" % ((train_error, test_error),))
-    return train_errors, test_errors, fig, ax
+    print("\t(mean_train_error, mean_test_error) = %r" % ((np.mean(mean_train_error), np.mean(mean_test_error)),))
+    print("\t(std_train_error, std_test_error) = %r" % ((np.mean(std_train_error), np.mean(std_test_error)),))
+    return mean_train_error, mean_test_error, std_train_error, std_test_error, fig, ax
 
 def simple_evaluation_linear_model(
         inputs, targets, test_fraction=None, reg_param=None):
@@ -604,7 +592,7 @@ def computeCost(X, y, theta2):
     inner = np.power(((X * theta2.T) - y), 2)
     return np.sum(inner) / (2 * len(X))
     
-def split_data(ifname, delimiter=None, has_header=False, columns=None, seed=42, fraction=0.15):
+'''def split_data(ifname, delimiter=None, has_header=False, columns=None, seed=42, fraction=0.15):
     """
     Imports a tab/comma/semi-colon/... separated data file as an array of 
     floating point numbers. If the import file has a header then this should
@@ -657,10 +645,10 @@ def split_data(ifname, delimiter=None, has_header=False, columns=None, seed=42, 
     training_data_as_array = np.array(training_data).astype(float)
     test_data_as_array = np.array(test_data).astype(float)
     # return the two data sets to caller
-    return training_data_as_array, test_data_as_array, field_names
+    return training_data_as_array, test_data_as_array, field_names'''
 
 
-if __name__ == '__main__':
+'''if __name__ == '__main__':
     """
     To run this script on just synthetic data use:
 
@@ -699,5 +687,5 @@ if __name__ == '__main__':
     elif len(sys.argv) == 4:
         # assumes that the third argument is the list of columns to import
         columns = list(map(int, sys.argv[3].split(","))) 
-        main(ifname=sys.argv[1], delimiter=sys.argv[2], columns=columns)
+        main(ifname=sys.argv[1], delimiter=sys.argv[2], columns=columns)'''
 

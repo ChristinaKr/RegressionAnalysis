@@ -3,9 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import numpy.linalg as linalg
 import math
-from split_train_test import split_data
+#from split_train_test import split_data
 
-def import_data(ifname):
+'''def import_data(ifname):
     """
     Imports data with file-name/-path ifname as a numpy array.
     """
@@ -16,7 +16,7 @@ def import_data(ifname):
         field_names = next(datareader)
         # create an empty list to store each row of data
         data = []
-        for row in datareader:
+        for row in datareader: 
             # for each row of data 
             # convert each element (from string) to float type
             row_of_floats = list(map(float,row))
@@ -25,13 +25,12 @@ def import_data(ifname):
         # convert the data (list object) into a numpy array.
         data_as_array = np.array(data)
         # return this array to caller
-        return data_as_array, field_names
+        return data_as_array, field_names'''
     
 def predictive_distribution(designmtx, beta, mN, SN):
     """
     Calculates the predictive distribution a linear model. This amounts to a
     mean and variance for each input point.
-
     parameters
     ----------
     designmtx - 2d (N x K) array of inputs (data-matrix or design-matrix) where
@@ -41,7 +40,6 @@ def predictive_distribution(designmtx, beta, mN, SN):
     mN - posterior mean of the weights (vector) 1d-array (or array-like)
         of length K
     SN - the posterior covariance matrix for the weights 2d (K x K)-array 
-
     returns
     -------
     ys - a vector of mean predictions, one for each input datapoint
@@ -69,7 +67,6 @@ def construct_rbf_feature_mapping(centres, scale):
         For D=1 can pass an M-vector (numpy array).
     scale - a float determining the width of the distribution. Equivalent role
         to the standard deviation in the Gaussian distribution.
-
     returns
     -------
     feature_mapping - a function which takes an NxD data matrix and returns
@@ -104,7 +101,6 @@ def calculate_weights_posterior(designmtx, targets, beta, m0, S0):
     """
     Calculates the posterior distribution (multivariate gaussian) for weights
     in a linear model.
-
     parameters
     ----------
     designmtx - 2d (N x K) array of inputs (data-matrix or design-matrix) where
@@ -114,7 +110,6 @@ def calculate_weights_posterior(designmtx, targets, beta, m0, S0):
     beta - the known noise precision
     m0 - prior mean (vector) 1d-array (or array-like) of length K
     S0 - the prior covariance matrix 2d-array
-
     returns
     -------
     mN - the posterior mean (vector)
@@ -133,7 +128,6 @@ def construct_feature_mapping_approx(feature_mapping, weights):
     """
     This function creates and returns a prediction function based on a
     feature mapping and some weights.
-
     The returned prediction function takes a set of input values and returns
     the predicted output for each.
     """
@@ -157,15 +151,12 @@ def plot_data_and_approximation(
     """
     Plot a function, some associated regression data and an approximation
     in a given range
-
     parameters
     ----------
     predict_func - the approximating function
     inputs - the input data
     targets - the targets
-
     <for optional arguments see plot_function_and_data>
-
     returns
     -------
     fig - the figure object for the plot
@@ -197,10 +188,8 @@ def simple_evaluation_linear_model(
     """
     Will split inputs and targets into train and test parts, then fit a linear
     model to the training part, and test on the both parts.
-
     Inputs can be a data matrix (or design matrix), targets should
     be real valued.
-
     parameters
     ----------
     inputs - the input design matrix (any feature mapping should already be
@@ -209,7 +198,6 @@ def simple_evaluation_linear_model(
     reg_param (optional) - the regularisation strength. If provided, then
         regularised least squares fitting is uses with this regularisation
         strength. Otherwise, (non-regularised) least squares is used.
-
     returns
     -------
     train_error - the training error for the approximation
@@ -232,7 +220,6 @@ def train_and_test(
     """
     Will fit a linear model with either least squares, or regularised least 
     squares to the training data, then evaluate on both test and training data
-
     parameters
     ----------
     train_inputs - the input design matrix for training
@@ -242,7 +229,6 @@ def train_and_test(
     reg_param (optional) - the regularisation strength. If provided, then
         regularised maximum likelihood fitting is uses with this regularisation
         strength. Otherwise, (non-regularised) least squares is used.
-
     returns
     -------
     train_error - the training error for the approximation
@@ -270,10 +256,8 @@ def cv_evaluation_linear_model(
     """
     Will split inputs and targets into train and test parts, then fit a linear
     model to the training part, and test on the both parts.
-
     Inputs can be a data matrix (or design matrix), targets should
     be real valued.
-
     parameters
     ----------
     inputs - the input design matrix (any feature mapping should already be
@@ -283,7 +267,6 @@ def cv_evaluation_linear_model(
     reg_param (optional) - the regularisation strength. If provided, then
         regularised least squares fitting is uses with this regularisation
         strength. Otherwise, (non-regularised) least squares is used.
-
     returns
     -------
     train_errors - the training errors for the approximation
@@ -339,7 +322,6 @@ def ml_weights(inputmtx, targets):
 def train_and_test_split(N, test_fraction=None):
     """
     Randomly generates a train/test split for data of size N.
-
     parameters
     ----------
     N - the dataset size
@@ -358,7 +340,6 @@ def train_and_test_partition(inputs, targets, train_part, test_part):
     """
     Splits a data matrix (or design matrix) and associated targets into train
     and test parts.
-
     parameters
     ----------
     inputs - a 2d numpy array whose rows are the datapoints, or can be a design
@@ -368,7 +349,6 @@ def train_and_test_partition(inputs, targets, train_part, test_part):
         data points. If the ith element is true then the ith data point will be
         added to the training data.
     test_part - (like train_part) but specifying the test points.
-
     returns
     -------     
     train_inputs - the training input matrix
@@ -387,12 +367,10 @@ def root_mean_squared_error(y_true, y_pred):
     """
     Evaluate how closely predicted values (y_pred) match the true values
     (y_true, also known as targets)
-
     Parameters
     ----------
     y_true - the true targets
     y_pred - the predicted targets
-
     Returns
     -------
     mse - The root mean squared error between true and predicted target
@@ -407,7 +385,6 @@ def plot_train_test_errors(
         control_var, experiment_sequence, train_errors, test_errors):
     """
     Plot the train and test errors for a sequence of experiments.
-
     parameters
     ----------
     control_var - the name of the control variable, e.g. degree (for polynomial)
@@ -578,19 +555,16 @@ def create_folds(N, num_folds):
     Achieves this by partitioning the data into num_folds (almost) equal
     subsets, where in the ith fold, the ith subset will be assigned to testing,
     with the remaining subsets assigned to training.
-
     parameters
     ----------
     N - the number of datapoints
     num_folds - the number of folds
-
     returns
     -------
     folds - a sequence of num_folds folds, each fold is a train and test array
         indicating (with a boolean array) whether a datapoint belongs to the
         training or testing part of the fold.
         Each fold is a (train_part, test_part) pair where:
-
         train_part - a boolean vector of length N, where if ith element is
             True if the ith data-point belongs to the training set, and False if
             otherwise.
@@ -637,18 +611,19 @@ def joint_log_probability_error(targets, mean_approx, sigma2Ns):
     return joint_log_error
     
 
-def main(ifname):
-    data, field_names = import_data(ifname)
+def rbf_bayesian(training_data, test_data, field_names):
+    
+    #data, field_names = import_data(ifname)
           
     test_fraction = 0.1
     # Import data and split into train and test parts
-    training_data, test_data, field_names = split_data(ifname, delimiter=';', has_header=True,seed=42, fraction=test_fraction)
+    #training_data, test_data, field_names = split_data(ifname, delimiter=';', has_header=True,seed=42, fraction=test_fraction)
     training_targets = training_data[:,11] #Quality of the wine
     test_targets = test_data[:,11]
     training_inputs = training_data[:, [0,1,2,3,4,5,6,7,8,9,10]]
     test_inputs = test_data[:, [0,1,2,3,4,5,6,7,8,9,10]]
      
-    data1 = data[:, [0,1,2,3,11]]
+    '''data1 = data[:, [0,1,2,3,11]]
     data2 = data[:, [4,5,6,7,11]]
     data3 = data[:, [8,9,10,11]]
     
@@ -658,7 +633,7 @@ def main(ifname):
     
     targets = data[:,11] #Quality of the wine
 
-    inputs = data[:, [0,1,2,3,4,5,6,7,8,9,10]]
+    inputs = data[:, [0,1,2,3,4,5,6,7,8,9,10]]'''
     
     training_fixed_acidity_inputs = training_inputs[:,0]
     training_volatile_acidity_inputs = training_inputs[:,1]
