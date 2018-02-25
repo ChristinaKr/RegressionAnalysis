@@ -55,12 +55,12 @@ def scatter_quality_pH(data):
     # create a single axis on that figure
     ax = fig.add_subplot(1,1,1)
     # histogram the data and label the axes
-    ax.set_xlabel("Quality")
-    ax.set_ylabel("pH")
+    ax.set_xlabel("pH")
+    ax.set_ylabel("Quality")
     fig.suptitle('How pH varies in different quality wines')
-    x_val = np.array(data[:,11]) 
-    ax.set_xlim([2.5,8.5])
-    y_val = np.array(data[:,8])
+    x_val = np.array(data[:,8]) 
+    ax.set_ylim([2.5,8.5])
+    y_val = np.array(data[:,11])
     ax.plot(x_val, y_val, 'x')
     ax.plot(x_val, np.poly1d(np.polyfit(x_val, y_val, 1))(x_val), color = 'r', linewidth = 2.0)
 
@@ -70,12 +70,12 @@ def scatter_quality_alcohol(data):
     # create a single axis on that figure
     ax = fig.add_subplot(1,1,1)
     # histogram the data and label the axes
-    ax.set_xlabel("Quality")
-    ax.set_ylabel("Alcohol")
+    ax.set_xlabel("Alcohol")
+    ax.set_ylabel("Quality")
     fig.suptitle('How alcohol content varies in different quality wines')
-    x_val = np.array(data[:,11]) 
-    ax.set_xlim([2.5,8.5])
-    y_val = np.array(data[:,10])
+    x_val = np.array(data[:,10]) 
+    ax.set_ylim([2.5,8.5])
+    y_val = np.array(data[:,11])
     ax.plot(x_val, y_val, 'x')
     ax.plot(x_val, np.poly1d(np.polyfit(x_val, y_val, 1))(x_val), color = 'r', linewidth = 2.0)
 
@@ -85,12 +85,12 @@ def scatter_quality_acidity(data):
     # create a single axis on that figure
     ax = fig.add_subplot(1,1,1)
     # histogram the data and label the axes
-    ax.set_xlabel("Quality")
-    ax.set_ylabel("Acidity")
+    ax.set_xlabel("Acidity")
+    ax.set_ylabel("Quality")
     fig.suptitle('How acidity content varies in different quality wines')
-    x_val = np.array(data[:,11]) 
-    ax.set_xlim([2.5,8.5])
-    y_val = np.array(data[:,0])
+    x_val = np.array(data[:,0]) 
+    ax.set_ylim([2.5,8.5])
+    y_val = np.array(data[:,11])
     ax.plot(x_val, y_val, 'x')
     ax.plot(x_val, np.poly1d(np.polyfit(x_val, y_val, 1))(x_val), color = 'r', linewidth = 2.0)
 
@@ -100,12 +100,12 @@ def scatter_quality_vacidity(data):
     # create a single axis on that figure
     ax = fig.add_subplot(1,1,1)
     # histogram the data and label the axes
-    ax.set_xlabel("Quality")
-    ax.set_ylabel("Volitile Acidity")
+    ax.set_xlabel("Volitile Acidity")
+    ax.set_ylabel("Quality")
     fig.suptitle('How volitile acidity content varies in different quality wines')
-    x_val = np.array(data[:,11]) 
-    ax.set_xlim([2.5,8.5])
-    y_val = np.array(data[:,1])
+    x_val = np.array(data[:,1]) 
+    ax.set_ylim([2.5,8.5])
+    y_val = np.array(data[:,11])
     ax.plot(x_val, y_val, 'x')
     ax.plot(x_val, np.poly1d(np.polyfit(x_val, y_val, 1))(x_val), color = 'r', linewidth = 2.0)
 
@@ -115,12 +115,12 @@ def scatter_quality_ca(data):
     # create a single axis on that figure
     ax = fig.add_subplot(1,1,1)
     # histogram the data and label the axes
-    ax.set_xlabel("Quality")
-    ax.set_ylabel("Citric Acid")
+    ax.set_xlabel("Citric Acid")
+    ax.set_ylabel("Quality")
     fig.suptitle('How citric acid content varies in different quality wines')
-    x_val = np.array(data[:,11]) 
-    ax.set_xlim([2.5,8.5])
-    y_val = np.array(data[:,2])
+    x_val = np.array(data[:,2]) 
+    ax.set_ylim([2.5,8.5])
+    y_val = np.array(data[:,11])
     ax.plot(x_val, y_val, 'x')
     ax.plot(x_val, np.poly1d(np.polyfit(x_val, y_val, 1))(x_val), color = 'r', linewidth = 2.0)
 
@@ -130,12 +130,12 @@ def scatter_quality_chlor(data):
     # create a single axis on that figure
     ax = fig.add_subplot(1,1,1)
     # histogram the data and label the axes
-    ax.set_xlabel("Quality")
-    ax.set_ylabel("Chlorides")
+    ax.set_xlabel("Chlorides")
+    ax.set_ylabel("Quality")
     fig.suptitle('How Chloride content varies in different quality wines')
-    x_val = np.array(data[:,11]) 
-    ax.set_xlim([2.5,8.5])
-    y_val = np.array(data[:,4])
+    x_val = np.array(data[:,4]) 
+    ax.set_ylim([2.5,8.5])
+    y_val = np.array(data[:,11])
     ax.plot(x_val, y_val, 'x')
     ax.plot(x_val, np.poly1d(np.polyfit(x_val, y_val, 1))(x_val), color = 'r', linewidth = 2.0)
     
@@ -145,12 +145,12 @@ def scatter_quality_fSO2(data):
     # create a single axis on that figure
     ax = fig.add_subplot(1,1,1)
     # histogram the data and label the axes
-    ax.set_xlabel("Quality")
-    ax.set_ylabel("Free SO2")
+    ax.set_xlabel("Free SO2")
+    ax.set_ylabel("Quality")
     fig.suptitle('How Free SO2 content varies in different quality wines')
-    x_val = np.array(data[:,11]) 
-    ax.set_xlim([2.5,8.5])
-    y_val = np.array(data[:,5])
+    x_val = np.array(data[:,5]) 
+    ax.set_ylim([2.5,8.5])
+    y_val = np.array(data[:,11])
     ax.plot(x_val, y_val, 'x')
     ax.plot(x_val, np.poly1d(np.polyfit(x_val, y_val, 1))(x_val), color = 'r', linewidth = 2.0)
 
@@ -160,12 +160,12 @@ def scatter_quality_totSO2(data):
     # create a single axis on that figure
     ax = fig.add_subplot(1,1,1)
     # histogram the data and label the axes
-    ax.set_xlabel("Quality")
-    ax.set_ylabel("Total SO2")
+    ax.set_xlabel("Total SO2")
+    ax.set_ylabel("Quality")
     fig.suptitle('How total SO2 content varies in different quality wines')
-    x_val = np.array(data[:,11]) 
-    ax.set_xlim([2.5,8.5])
-    y_val = np.array(data[:,6])
+    x_val = np.array(data[:,6]) 
+    ax.set_ylim([2.5,8.5])
+    y_val = np.array(data[:,11])
     ax.plot(x_val, y_val, 'x')
     ax.plot(x_val, np.poly1d(np.polyfit(x_val, y_val, 1))(x_val), color = 'r', linewidth = 2.0)                                        
 
@@ -175,12 +175,12 @@ def scatter_quality_density(data):
     # create a single axis on that figure
     ax = fig.add_subplot(1,1,1)
     # histogram the data and label the axes
-    ax.set_xlabel("Quality")
-    ax.set_ylabel("Density")
+    ax.set_xlabel("Density")
+    ax.set_ylabel("Quality")
     fig.suptitle('How density varies in different quality wines')
-    x_val = np.array(data[:,11]) 
-    ax.set_xlim([2.5,8.5])
-    y_val = np.array(data[:,7])
+    x_val = np.array(data[:,7]) 
+    ax.set_ylim([2.5,8.5])
+    y_val = np.array(data[:,11])
     ax.plot(x_val, y_val, 'x')
     ax.plot(x_val, np.poly1d(np.polyfit(x_val, y_val, 1))(x_val), color = 'r', linewidth = 2.0)                                                                                                                        
 
@@ -190,12 +190,12 @@ def scatter_quality_sulphates(data):
     # create a single axis on that figure
     ax = fig.add_subplot(1,1,1)
     # histogram the data and label the axes
-    ax.set_xlabel("Quality")
-    ax.set_ylabel("Sulphates")
+    ax.set_xlabel("Sulphates")
+    ax.set_ylabel("Quality")
     fig.suptitle('How sulphate content varies in different quality wines')
-    x_val = np.array(data[:,11]) 
-    ax.set_xlim([2.5,8.5])
-    y_val = np.array(data[:,9])
+    x_val = np.array(data[:,9]) 
+    ax.set_ylim([2.5,8.5])
+    y_val = np.array(data[:,11])
     ax.plot(x_val, y_val, 'x')
     ax.plot(x_val, np.poly1d(np.polyfit(x_val, y_val, 1))(x_val), color = 'r', linewidth = 2.0)                                                                                                                                                                                                                                                                                                                                                                        
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
@@ -210,7 +210,7 @@ def scatter_ph_versus_ca(data):
     fig2.suptitle('How Citric Acid effects pH')
     ax2.plot(x_val, y_val, 'x')
     # linear line of best fit
-    ax2.plot(np.unique(x_val), np.poly1d(np.polyfit(x_val, y_val, 1))(np.unique(x_val)), color = 'r', linewidth = 2.0)
+    ax2.plot(x_val, np.poly1d(np.polyfit(x_val, y_val, 1))(x_val), color = 'r', linewidth = 2.0)
 
 def scatter_quality_sugar(data):
     # create an empty figure object
@@ -218,12 +218,12 @@ def scatter_quality_sugar(data):
     # create a single axis on that figure
     ax = fig.add_subplot(1,1,1)
     # histogram the data and label the axes
-    ax.set_xlabel("Quality")
-    ax.set_ylabel("Sugar")
+    ax.set_xlabel("Sugar")
+    ax.set_ylabel("Quality")
     fig.suptitle('How Sugar varies in different quality wines')
-    x_val = np.array(data[:,11])
-    ax.set_xlim([2.5,8.5])
-    y_val = np.array(data[:,3])
+    x_val = np.array(data[:,3])
+    ax.set_ylim([2.5,8.5])
+    y_val = np.array(data[:,11])
     ax.plot(x_val, y_val, 'x')
     ax.plot(x_val, np.poly1d(np.polyfit(x_val, y_val, 1))(x_val), color = 'r', linewidth = 2.0)
 
@@ -255,13 +255,12 @@ def scatter_alcohol_density(data):
     ax.plot(x_val, y_val, 'x')
     ax.plot(x_val, np.poly1d(np.polyfit(x_val, y_val, 1))(x_val), color = 'r', linewidth = 2.0)
 
-    
 
 def main(ifname):
     data = import_data(ifname)
     if type(data) == np.ndarray:
         print("Data array loaded: there are %d rows" % data.shape[0])
-        print ("first row:", data[0,:])
+        print "first row:", data[0,:]
     histogram_quality(data)
     hist_citricA(data)
     scatter_ph_versus_ca(data)
