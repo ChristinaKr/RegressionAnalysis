@@ -33,9 +33,7 @@ def split_data(ifname, delimiter=None, has_header=False, columns=None, seed=42, 
 
     np.random.seed(seed)
     test_rows = np.unique(np.array(np.random.uniform(size = int(fraction*1599))*1599).astype(int))
-    print(test_rows)
-
-
+#    print(test_rows)
 
     if delimiter is None:
         delimiter = '\t'
@@ -287,62 +285,100 @@ def error_with_highest_corr_inputs_only(inputCorr, targetCorr, seed=None):
     return SSEsRounded, SSEsNotRounded
     
 def plot_all_inputs_vs_most_correlated_inputs(data, inputCorr, targetCorr):
-    
+    # Defines 100 runs to be taken to get a stable prediction
     runs = 100
+    # The errors will be plotted over a range of 20 ks
     k_range = 20
     SSEs2dCorrInputs = np.zeros(shape=(runs, k_range))
     SSEs2dallInputs = np.zeros(shape=(runs, k_range))
-    
+    # Takes the average of each error over 100 runs for each k
     for i in range(runs):
         train_inputs, train_targets, test_inputs, test_targets, inputs = test_and_trainings_data(data, seed = i+1)
-        SSEsRounded, allInputs = calculate_errors_for_different_k(train_inputs, train_targets, test_inputs, test_targets, 20, seed = i +1)  
+        Unimportant, allInputs = calculate_errors_for_different_k(train_inputs, train_targets, test_inputs, test_targets, 20, seed = i +1)  
         SSEsCorrRounded, SSEsCorrInputs = error_with_highest_corr_inputs_only(inputCorr, targetCorr, seed = i +1)
         SSEs2dCorrInputs[i] = SSEsCorrInputs # 100 x 20
         SSEs2dallInputs[i] = allInputs # 100 x 20
-
-    SSEs2dallInputs = np.mean(SSEs2dallInputs, axis = 0)
+    # Calculate the mean error for each k
+    AllInputs = np.mean(SSEs2dallInputs, axis = 0)
     corrInputs = np.mean(SSEs2dCorrInputs, axis = 0)
+    # Calculate the standard error
+    SEAllInput = np.empty(k_range)
+    SECorrInput = np.empty(k_range)
+    for i in range(k_range):
+        SEAllInput[i] = np.std(SSEs2dallInputs[:,i])/np.sqrt(runs) # 1 x 20
+        SECorrInput[i] = np.std(SSEs2dCorrInputs[:,i])/np.sqrt(runs) # 1 x 20
+    # Use the standard error to calculate confidence intervals
+    upper_allInput = AllInputs + SEAllInput
+    lower_allInput = AllInputs - SEAllInput
+    upper_CorrInput = corrInputs + SECorrInput
+    lower_CorrInput = corrInputs - SECorrInput
     
-    # Plot it
+    # Mean standard error
+    SECorrMean = np.mean(SECorrInput)
+    SEAllMean = np.mean(SEAllInput)
+    
+    
+    # Plot the errors of both parameter options over different values of k for 100 runs
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     xs = np.linspace(1, k_range, num=k_range)
-    ys = SSEs2dallInputs
+    ys = AllInputs
     allInputs_line, = ax.plot(xs, ys, 'r-', linewidth=3)
     ys = corrInputs
     corrInputs_line, = ax.plot(xs, ys, 'g-', linewidth=3)
     ax.set_xlabel("k")
-    ax.set_ylabel("MSE")
+    ax.set_ylabel("$E_{RMS}$")
     ax.legend([corrInputs_line, allInputs_line],["Highest correlating parameters only", "All 11 input parameters"])
     fig.suptitle('Errors over different values of k run 100 times - Input parameter comparison') 
+    # Plot standard error around lines
+    ax.fill_between(xs, lower_CorrInput, upper_CorrInput, alpha=0.2, color='g')
+    ax.fill_between(xs, lower_allInput, upper_allInput, alpha=0.2, color='r')
     plt.show()
     
     # Find and print the outcomes (smallest error and optimal k)
     indexCorrSSE = np.argmin(corrInputs)
-    indexAllPSSE = np.argmin(SSEs2dallInputs)
+    indexAllPSSE = np.argmin(AllInputs)
     minSSECorr = corrInputs[indexCorrSSE]
-    minSSEAllP = SSEs2dallInputs[indexAllPSSE] 
+    minSSEAllP = AllInputs[indexAllPSSE] 
     optKCorr = xs[indexCorrSSE]
     optKAllP = xs[indexAllPSSE]
     
-    print("The smallest mean error over 100 runs for only the most highly correlated parameters is", minSSECorr, "with a k of", optKCorr)
-    print("The smallest mean error over 100 runs for all parameters included is", minSSEAllP, "with a k of", optKAllP)
+    print("The smallest mean error over 100 runs for only the most highly correlated parameters is", minSSECorr, "with a k of", optKCorr, "and a mean standard error of", SECorrMean)
+    print("The smallest mean error over 100 runs for all parameters included is", minSSEAllP, "with a k of", optKAllP, "and a mean standard error of", SEAllMean)
     
 def calculate_and_plot_rounded_vs_unrounded_mse(data):
+    # Defines 100 runs to be taken to get a stable prediction
     runs = 100
+    # The errors will be plotted over a range of 20 ks
     k_range = 20
     SSEs2dRounded = np.zeros(shape=(runs, k_range))
     SSEs2dNotRounded = np.zeros(shape=(runs, k_range))
+    # Takes the average of each error over 100 runs for each k
     for i in range(runs):
         train_inputs, train_targets, test_inputs, test_targets, inputs = test_and_trainings_data(data, seed = i+1)
         SSEsRounded, SSEsNotRounded = calculate_errors_for_different_k(train_inputs, train_targets, test_inputs, test_targets, 20, seed = i +1)
         SSEs2dRounded[i] = SSEsRounded # 100 x 20
         SSEs2dNotRounded[i] = SSEsNotRounded # 100 x 20
+    # Calculate the mean error for each k
+    SSEsRoundedMean = np.mean(SSEs2dRounded, axis = 0) # 1 x 20
+    SSEsNotRoundedMean = np.mean(SSEs2dNotRounded, axis = 0) # 1 x 20
+    # Calculate the standard error
+    SERounded = np.empty(k_range)
+    SENotRounded = np.empty(k_range)
+    for i in range(k_range):
+        SERounded[i] = np.std(SSEs2dRounded[:,i])/np.sqrt(runs) # 1 x 20
+        SENotRounded[i] = np.std(SSEs2dNotRounded[:,i])/np.sqrt(runs) # 1 x 20
+    # Use the standard error to calculate confidence intervals
+    upper_rounded = SSEsRoundedMean + SERounded
+    lower_rounded = SSEsRoundedMean - SERounded
+    upper_unrounded = SSEsNotRoundedMean + SENotRounded
+    lower_unrounded = SSEsNotRoundedMean - SENotRounded
     
-    SSEsRoundedMean = np.mean(SSEs2dRounded, axis = 0)
-    SSEsNotRoundedMean = np.mean(SSEs2dNotRounded, axis = 0)
+    # Mean standard error
+    SERMean = np.mean(SERounded)
+    SENRMean = np.mean(SENotRounded)
     
-    # Plot it
+    # Plot comparison of rounded and unrounded prediction errors over different values of k run 100 times
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     xs = np.linspace(1, k_range, num=k_range)
@@ -351,9 +387,12 @@ def calculate_and_plot_rounded_vs_unrounded_mse(data):
     ys = SSEsNotRoundedMean
     notRounded_SSE_line, = ax.plot(xs, ys, 'r-', linewidth=3)
     ax.set_xlabel("k")
-    ax.set_ylabel("MSE")
+    ax.set_ylabel("$E_{RMS}$")
     ax.legend([rounded_SSE_line, notRounded_SSE_line],["rounded predictions", "not rounded predictions"])
     fig.suptitle('Errors over different values of k run 100 times - Rounding comparison') 
+    # Plot standard error around lines
+    ax.fill_between(xs, lower_rounded, upper_rounded, alpha=0.2, color='g')
+    ax.fill_between(xs, lower_unrounded, upper_unrounded, alpha=0.2, color='r')
     plt.show()
     
     # Find and print the outcomes (smallest error and optimal k)
@@ -364,9 +403,9 @@ def calculate_and_plot_rounded_vs_unrounded_mse(data):
     optKMeanRounded = xs[indexRoundedMeanSSE]
     optKMeanNotRounded = xs[indexNotRoundedMeanSSE]
     
-    print("The smallest mean error over 100 runs with rounded predictions is", minSSEMeanRounded, "with a k of", optKMeanRounded)
-    print("The smallest mean error over 100 runs with unrounded predictions is", minSSEMeanNotRounded, "with a k of", optKMeanNotRounded)
-     
+    print("The smallest mean error over 100 runs with rounded predictions is", minSSEMeanRounded, "with a k of", optKMeanRounded, "and a mean standard error of", SERMean)
+    print("The smallest mean error over 100 runs with unrounded predictions is", minSSEMeanNotRounded, "with a k of", optKMeanNotRounded, "and a mean standard error of", SENRMean)
+    
 def final_test(data, test):
     # Final test performed with unseen 15% of data with only highest correlating parameter 
     test_inputs = test[:,[0,1,2,3,4,5,6,7,8,9,10]]
@@ -439,22 +478,6 @@ def final_test(data, test):
     notImportant, predictions = construct_knn_approx(inputCorr, targetCorr, 18, test_inputs_corr, test_targets, None)
     SSE = sum_of_squared_errors(targetCorr, predictions, test_targets)
     print("The error for the unseen 15% of test data with an optimized k of 18 is", SSE)
-    
-    print('prediction: ', np.shape(predictions))
-    print('targetCorr: ', np.shape(test_targets))
-    # Plot it
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    xs = np.linspace(1, (test_inputs_corr[:,0]).size, num=50)
-    ys = predictions[:,50]
-    predictive_line, = ax.plot(xs, ys, 'g-', linewidth=3)
-    ys = test_targets[:,50]
-    target_line, = ax.plot(xs, ys, 'r-', linewidth=3)
-    ax.set_xlabel("k")
-    ax.set_ylabel("MSE")
-    ax.legend([predictive_line, target_line],["predictions", "target"])
-    fig.suptitle('Predictions vs. target per data point') 
-    plt.show()
     
     
     
