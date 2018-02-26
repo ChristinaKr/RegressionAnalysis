@@ -68,6 +68,11 @@ def split_data(ifname, delimiter=None, has_header=False, columns=None, seed=42, 
     # return the two data sets to caller
     return training_data_as_array, test_data_as_array
 
+def normalize(data):
+    for i in range (1,len(data[0])):
+        data[:,i] = (data[:,i] - np.mean(data[:,i]))/np.std(data[:,i])
+    return data
+
 def second_degree_designmtx(data):
     """
     Converts the raw data matrix into a designmtx 
@@ -186,7 +191,8 @@ def evaluate_reg_param(designmtx, targets, folds, reg_params=None):
         test_mean_errors[r] = test_mean_error
         train_stdev_errors[r] = train_stdev_error
         test_stdev_errors[r] = test_stdev_error
-    print("Min test error: ", min(test_mean_errors)," for alpha = ", optimal_reg)
+    print("Min train error: ", min(train_mean_errors))
+    print("Min test error: ", min(test_mean_errors)," for lambda = ", optimal_reg)
     # Now plot the results
     fig, ax = plot_train_test_errors(
         "$\lambda$", reg_params, train_mean_errors, test_mean_errors)
@@ -203,7 +209,8 @@ def evaluate_reg_param(designmtx, targets, folds, reg_params=None):
     upper = test_mean_errors + test_stdev_errors/np.sqrt(num_folds)
     ax.fill_between(reg_params, lower, upper, alpha=0.2, color='r')
     ax.set_xscale('log')
-    
+    return optimal_reg
+
 def plot_train_test_errors(
         control_var, experiment_sequence, train_errors, test_errors):
     """
@@ -284,18 +291,32 @@ def main(ifname='winequality-red.csv', delimiter=';', has_header=True, folds = 1
     Train_Data, Test_Data = split_data(ifname, delimiter, has_header, [0,1,2,3,4,5,6,7,8,9,10])
     Train_Targets, Test_Targets = split_data(ifname, delimiter, has_header, [11])
     Train_Second = second_degree_designmtx(Train_Data)
-    print("Second: ", len(Train_Second[0]))
+    Test_Data_Second = second_degree_designmtx(Test_Data)
     Train_Third = third_degree_designmtx(Train_Data)
-    print("Third: ", len(Train_Third[0]))
+    Test_Data_Third = third_degree_designmtx(Test_Data)
     Train_Fourth = fourth_degree_designmtx(Train_Data)
-    print("Fourth: ", len(Train_Fourth[0]))
+    Test_Data_Fourth = fourth_degree_designmtx(Test_Data)
     
-    print("Second degree polynomial regression")
-    evaluate_reg_param(Train_Second, Train_Targets, create_cv_folds(len(Train_Second), folds), reg_params = np.logspace(-2,5))
-    print("Third degree polynomial regression")
-    evaluate_reg_param(Train_Third, Train_Targets, create_cv_folds(len(Train_Third), folds), reg_params = np.logspace(2,7))
-    print("Fourth degree polynomial regression")
-    evaluate_reg_param(Train_Fourth, Train_Targets, create_cv_folds(len(Train_Third), folds), reg_params = np.logspace(6,10))
+    #print("Second degree polynomial regression")
+    #evaluate_reg_param(Train_Second, Train_Targets, create_cv_folds(len(Train_Second), folds), reg_params = np.logspace(-2,5))
+    #print("Third degree polynomial regression")
+    #evaluate_reg_param(Train_Third, Train_Targets, create_cv_folds(len(Train_Third), folds), reg_params = np.logspace(2,7))
+    #print("Fourth degree polynomial regression")
+    #evaluate_reg_param(Train_Fourth, Train_Targets, create_cv_folds(len(Train_Third), folds), reg_params = np.logspace(6,10))
+    
+    
+    #print("Second degree polynomial regression (normalized)")
+    reg_second = evaluate_reg_param(normalize(Train_Second), Train_Targets, create_cv_folds(len(Train_Second), folds), reg_params = np.logspace(-1,3))
+    #print("Third degree polynomial regression (normalized)")
+    reg_third = evaluate_reg_param(normalize(Train_Third), Train_Targets, create_cv_folds(len(Train_Third), folds), reg_params = np.logspace(-1,3))
+    #print("Fourth degree polynomial regression (normalized)")
+    reg_fourth =evaluate_reg_param(normalize(Train_Fourth), normalize(Train_Targets), create_cv_folds(len(Train_Third), folds), reg_params = np.logspace(-1,3))
+    
+    print("Train, Test error (degree 2): ", train_and_test(normalize(Train_Second), Train_Targets, normalize(Test_Data_Second), Test_Targets, reg_param = reg_second))
+    
+    print("Train, Test error (degree 3): ", train_and_test(normalize(Train_Third), Train_Targets, normalize(Test_Data_Third), Test_Targets, reg_param = reg_third))
+          
+    print("Train, Test error (degree 4): ", train_and_test(normalize(Train_Fourth), Train_Targets, normalize(Test_Data_Fourth), Test_Targets, reg_param = reg_fourth))
 
 
 if __name__ == '__main__':
